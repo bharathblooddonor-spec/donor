@@ -1,0 +1,437 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { apDistricts, apBloodGroups } from '../data/apData';
+import { apiService } from '../api/apiService';
+import { PostRequestModal } from '../components/PostRequestModal';
+import { NativePicker } from '../components/NativePicker';
+
+export const RequestsScreen = () => {
+  const [selectedBloodGroup, setSelectedBloodGroup] = useState('All Blood Groups');
+  const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
+  const [requests, setRequests] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchRequests = async () => {
+    try {
+      const data = await apiService.getRequests({
+        district: selectedDistrict,
+        bloodGroup: selectedBloodGroup
+      });
+      setRequests(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [selectedDistrict, selectedBloodGroup]);
+
+  const handlePostRequest = async (newRequestData) => {
+    await apiService.createRequest(newRequestData);
+    fetchRequests();
+    Alert.alert('Success', 'Your emergency request has been broadcasted across AP!');
+  };
+
+  const handleIDonate = (req) => {
+    const text = encodeURIComponent(`Hello ${req.contactName}, I saw your emergency blood request for ${req.patientName} (${req.bloodGroup}, ${req.units} units) at ${req.hospitalName}. I want to donate!`);
+    const url = `whatsapp://send?phone=${req.phone.replace(/[^0-9]/g, '')}&text=${text}`;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://wa.me/${req.phone.replace(/[^0-9]/g, '')}?text=${text}`).catch(() => {});
+    });
+  };
+
+  const handleMarkFulfilled = async (id) => {
+    await apiService.fulfillRequest(id);
+    fetchRequests();
+    Alert.alert('Thank you', 'Request marked as fulfilled.');
+  };
+
+  const bloodGroupOptions = ['All Blood Groups', ...apBloodGroups];
+  const districtOptions = ['All Districts', ...apDistricts];
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Emergency Board Header Banner */}
+      <View style={styles.emergencyCard}>
+        <View style={styles.boardHeaderRow}>
+          <View style={styles.boardBadge}>
+            <Text style={styles.boardBadgeText}>EMERGENCY BOARD</Text>
+          </View>
+        </View>
+
+        <View style={styles.boardBodyRow}>
+          <View style={styles.boardTextCol}>
+            <Text style={styles.boardTitle}>Need Blood Urgently?</Text>
+            <Text style={styles.boardSubtitle}>
+              Broadcast your request to thousands of volunteers across AP.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.postReqBtn}
+            onPress={() => setIsModalOpen(true)}
+            activeOpacity={0.85}
+          >
+            <Feather name="plus" size={15} color="#ffffff" style={{ marginRight: 4 }} />
+            <Text style={styles.postReqBtnText}>Post Request</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Filter Dropdowns Row */}
+      <View style={styles.filtersRow}>
+        <View style={styles.flex1}>
+          <NativePicker
+            selectedValue={selectedBloodGroup}
+            onValueChange={setSelectedBloodGroup}
+            items={bloodGroupOptions}
+          />
+        </View>
+
+        <View style={styles.flex1}>
+          <NativePicker
+            selectedValue={selectedDistrict}
+            onValueChange={setSelectedDistrict}
+            items={districtOptions}
+          />
+        </View>
+      </View>
+
+      {/* Requests List */}
+      <View style={styles.requestsList}>
+        {requests.map((item) => (
+          <View key={item.id} style={[styles.requestCard, item.fulfilled && styles.fulfilledCard]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.bloodReqCircle}>
+                <Text style={styles.bloodReqCircleText}>{item.bloodGroup}</Text>
+                <Text style={styles.bloodReqCircleSub}>REQUIRED</Text>
+              </View>
+
+              <View style={styles.patientMetaCol}>
+                <View style={styles.patientNameRow}>
+                  <Text style={styles.patientName}>{item.patientName}</Text>
+                  {item.isUrgent && !item.fulfilled && (
+                    <View style={styles.urgentBadge}>
+                      <Text style={styles.urgentBadgeText}>URGENT</Text>
+                    </View>
+                  )}
+                  {item.fulfilled && (
+                    <View style={styles.fulfilledBadge}>
+                      <Text style={styles.fulfilledBadgeText}>FULFILLED</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.metaIconRow}>
+                  <Feather name="briefcase" size={12} color="#64748B" style={{ marginRight: 4 }} />
+                  <Text style={styles.metaText}>{item.hospitalName}</Text>
+                </View>
+
+                <View style={styles.metaIconRow}>
+                  <Feather name="calendar" size={12} color="#64748B" style={{ marginRight: 4 }} />
+                  <Text style={styles.metaText}>{item.dateNeeded}</Text>
+                </View>
+              </View>
+
+              <View style={styles.unitsPill}>
+                <Text style={styles.unitsText}>{item.units} Units</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailBox}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Reason: </Text>
+                <Text style={styles.detailValueBold}>{item.reason}</Text>
+              </View>
+
+              <View style={styles.detailRowBetween}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Contact: </Text>
+                  <Text style={styles.detailValueBold}>{item.contactName}</Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Phone: </Text>
+                  <Text style={styles.detailValueBold}>{item.phone}</Text>
+                </View>
+              </View>
+            </View>
+
+            {!item.fulfilled ? (
+              <View style={styles.buttonsRow}>
+                <TouchableOpacity
+                  style={styles.donateBtn}
+                  onPress={() => handleIDonate(item)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="heart" size={15} color="#ffffff" style={{ marginRight: 6 }} />
+                  <Text style={styles.donateBtnText}>I Can Donate</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.fulfillBtn}
+                  onPress={() => handleMarkFulfilled(item.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.fulfillBtnText}>Mark Fulfilled</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <TouchableOpacity style={styles.reportFooter} activeOpacity={0.7}>
+              <Feather name="flag" size={11} color="#94a3b8" style={{ marginRight: 4 }} />
+              <Text style={styles.reportText}>Report request</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+
+      <PostRequestModal
+        visible={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handlePostRequest}
+      />
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  emergencyCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+  },
+  boardHeaderRow: {
+    marginBottom: 6,
+  },
+  boardBadge: {
+    backgroundColor: '#D32F2F',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  boardBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  boardBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  boardTextCol: {
+    flex: 1,
+  },
+  boardTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  boardSubtitle: {
+    color: '#94a3b8',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  postReqBtn: {
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postReqBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  flex1: {
+    flex: 1,
+  },
+  requestsList: {
+    gap: 14,
+    paddingBottom: 24,
+  },
+  requestCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    elevation: 2,
+  },
+  fulfilledCard: {
+    opacity: 0.7,
+    backgroundColor: '#f1f5f9',
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  bloodReqCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#D32F2F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  bloodReqCircleText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  bloodReqCircleSub: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 7,
+    fontWeight: '800',
+  },
+  patientMetaCol: {
+    flex: 1,
+  },
+  patientNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  patientName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  urgentBadge: {
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  urgentBadgeText: {
+    color: '#D32F2F',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  fulfilledBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  fulfilledBadgeText: {
+    color: '#16a34a',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  metaIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 1,
+  },
+  metaText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  unitsPill: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  unitsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  detailBox: {
+    backgroundColor: '#fff5f5',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    marginBottom: 12,
+    gap: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailRowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  detailValueBold: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#991b1b',
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  donateBtn: {
+    flex: 1,
+    backgroundColor: '#D32F2F',
+    height: 42,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donateBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  fulfillBtn: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    height: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fulfillBtnText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reportFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  reportText: {
+    fontSize: 10,
+    color: '#94a3b8',
+  },
+});

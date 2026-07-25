@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Bharath Blood Donor",
+    "slug": "bharath-blood-donor-ap",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bharathblooddonor.ap",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Bharath Blood Donor requires location access to connect you with emergency blood donors nearby in Andhra Pradesh.",
+        "NSPhotoLibraryUsageDescription": "Allow app to upload donor profile images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.bharathblooddonor.ap",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CALL_PHONE"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bharath-blood-donor-ap-001"
+      }
+    }
+  }
+}
