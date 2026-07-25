@@ -25,9 +25,9 @@ if "%choice%"=="5" goto end
 echo.
 echo Building Android Debug APK...
 set JAVA_HOME=C:\Program Files\Java\jdk-17
-cd /d %~dp0..\android
+cd /d %~dp0android
 call gradlew.bat assembleDebug
-copy %~dp0..\android\app\build\outputs\apk\debug\app-debug.apk %~dp0android-debug.apk /Y
+copy %~dp0android\app\build\outputs\apk\debug\app-debug.apk %~dp0android-debug.apk /Y
 echo.
 echo SUCCESS! Output saved to: %~dp0android-debug.apk
 pause
@@ -37,9 +37,9 @@ goto end
 echo.
 echo Building Android Production App Bundle (.aab)...
 set JAVA_HOME=C:\Program Files\Java\jdk-17
-cd /d %~dp0..\android
+cd /d %~dp0android
 call gradlew.bat bundleRelease
-copy %~dp0..\android\app\build\outputs\bundle\release\app-release.aab %~dp0android-release.aab /Y
+copy %~dp0android\app\build\outputs\bundle\release\app-release.aab %~dp0android-release.aab /Y
 echo.
 echo SUCCESS! Output saved to: %~dp0android-release.aab
 pause
@@ -49,9 +49,9 @@ goto end
 echo.
 echo Building Android Release APK...
 set JAVA_HOME=C:\Program Files\Java\jdk-17
-cd /d %~dp0..\android
+cd /d %~dp0android
 call gradlew.bat assembleRelease
-copy %~dp0..\android\app\build\outputs\apk\release\app-release.apk %~dp0android-release.apk /Y
+copy %~dp0android\app\build\outputs\apk\release\app-release.apk %~dp0android-release.apk /Y
 echo.
 echo SUCCESS! Output saved to: %~dp0android-release.apk
 pause
