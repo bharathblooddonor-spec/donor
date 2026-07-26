@@ -2,9 +2,10 @@
 
 Everything needed to get from this repo to a published app, in order.
 
-> **Status: not yet submittable.** The code is ready; the account setup, hosted
-> legal pages, and real donor data are not. Work through Part 1 and Part 5
-> before you build anything you intend to upload.
+> **Status: Android builds; iOS needs your Apple login; not yet submittable.**
+> Firebase is live, security rules are deployed, legal pages are published, and
+> a signed production AAB has been built. The one thing standing between this
+> and a submission is **real donor data** — see Part 5.
 
 ---
 
@@ -97,38 +98,36 @@ this app has no image uploads.
 
 ## Part 2 — Android (Google Play)
 
-### 2.1 Generate an upload keystore
+### 2.1 Signing — already done
 
-```bash
-keytool -genkeypair -v -storetype PKCS12 \
-  -keystore upload-keystore.jks \
-  -alias upload -keyalg RSA -keysize 2048 -validity 10000
-```
+EAS generated an upload keystore when the first build ran and stores it against
+the project. You do **not** need `keytool`, and there is no `keystore.properties`
+to manage.
 
-> **Back this file up somewhere permanent and offline.** If you lose it you can
-> never publish an update to the same Play listing again. (Play App Signing can
-> reset a lost *upload* key, but only if you enrolled — do enrol.)
-
-Create `android/keystore.properties` (already git-ignored):
-
-```properties
-storeFile=/absolute/path/to/upload-keystore.jks
-storePassword=your-store-password
-keyAlias=upload
-keyPassword=your-key-password
-```
-
-`android/app/build.gradle` picks this up automatically. Without it, release
-builds fall back to the debug keystore and log a warning — Play rejects those.
+> **Back it up anyway.** If the keystore is lost you can never publish an update
+> to the same Play listing again:
+>
+> ```bash
+> npx eas-cli credentials -p android      # → Download keystore
+> ```
+>
+> Keep the downloaded file offline. Also enrol in **Play App Signing** during
+> Play Console setup — it is the only route to recovering a lost upload key.
 
 ### 2.2 Build the AAB
 
 ```bash
-npx eas-cli build -p android --profile production
+npm run eas:build:android:aab      # or: npx eas-cli build -p android --profile production
 ```
 
-Set `EXPO_PUBLIC_API_URL`-style Firebase vars for the build in `eas.json` under
-`build.production.env`, or as EAS secrets.
+Firebase config is already wired into `eas.json` under each profile's `env`.
+EAS builds run on Expo's servers and never see your local `.env`, so anything
+the app reads at runtime has to live there (or as an EAS secret). The values in
+`eas.json` are Firebase web config, which is public by design — never add a
+service account key.
+
+`autoIncrement` is on for the production profile, so `versionCode` bumps itself
+on every build. Play rejects a re-used `versionCode`.
 
 ### 2.3 Play Console
 
@@ -150,15 +149,33 @@ Set `EXPO_PUBLIC_API_URL`-style Firebase vars for the build in `eas.json` under
 
 ## Part 3 — iOS (App Store)
 
-You need a Mac with Xcode for local builds, or use EAS cloud builds.
+**This step must be run by you, interactively.** EAS needs to sign in to your
+Apple Developer account and prompts for your Apple ID plus a 2FA code, so it
+cannot run unattended:
 
 ```bash
 npx eas-cli build -p ios --profile production
+```
+
+It will ask, in order:
+
+1. Apple ID email and password
+2. The 6-digit 2FA code sent to your Apple devices
+3. Which team to use (if you belong to more than one)
+4. Whether to create a Distribution Certificate and Provisioning Profile —
+   answer **yes**; EAS generates and stores both for you
+
+Only the first build asks. Afterwards the credentials live on the EAS server and
+later builds are non-interactive.
+
+Then, to submit:
+
+```bash
 npx eas-cli submit -p ios
 ```
 
 Fill in the real values in `eas.json` under `submit.production.ios`
-(`appleId`, `ascAppId`, `appleTeamId`).
+(`appleId`, `ascAppId`, `appleTeamId`) first.
 
 ### App Store Connect
 
@@ -182,51 +199,53 @@ Guidelines this app is most likely to be judged against:
 
 ---
 
-## Part 4 — Regenerating native folders
+## Part 4 — Native folders
 
-`android/` is committed, so EAS builds in "bare" mode and **ignores most of
-`app.json`**. Both `app.json` and `android/app/src/main/AndroidManifest.xml`
-have been kept in sync by hand.
+`android/` and `ios/` are **not committed** — they are generated from `app.json`
+by `npx expo prebuild`, which EAS runs for you on every build.
 
-If you prefer Expo to manage native code (recommended — fewer things to keep in
-sync), delete the folder and let prebuild regenerate it:
+This is deliberate. When those folders exist in the repo, EAS Build ignores
+`app.json` for icon, splash, plugins, and **permissions** — so the two silently
+drift apart and your permission cleanup never reaches the built app. Keeping
+them out means `app.json` is the single source of truth for both platforms.
+
+To inspect what EAS will generate, without committing it:
 
 ```bash
-rm -rf android
-npx expo prebuild --clean --platform android
+npx expo prebuild --clean        # creates android/ and ios/ locally (git-ignored)
 ```
-
-Your `keystore.properties` change would need to be re-applied after that, since
-prebuild rewrites `build.gradle`.
-
----
 
 ## Part 5 — What is still blocking submission
 
-These are not code problems. Nothing in the repo can fix them.
+**Done:** Firebase project live in `asia-south1`; security rules and composite
+indexes deployed; privacy policy, terms, and support page published and linked
+in-app; upload keystore generated and held by EAS; signed production AAB built;
+reviewer test account created.
 
-- [ ] **Real donors.** The fabricated seed data was removed — publishing
-      invented people with real-format Indian phone numbers is both a store
-      violation and a privacy risk. You chose to seed by open sign-up: recruit
-      **50–100 genuinely consented donors** before submitting, or reviewers see
-      an empty app (Apple 4.2).
-- [ ] **Host the privacy policy.** Fill in every `[BRACKETED]` field in
-      `PRIVACY-POLICY.md`, publish it, and put the real URL in
-      `src/constants/legal.js`. Do the same for terms of use.
-- [ ] **Verify every helpline number** in `src/screens/AboutAPScreen.js` by
-      calling it. Only 108 and 104 are listed, because the previous numbers
-      could not be verified — a wrong number in a medical emergency app is
-      dangerous. Add more only after confirming each one.
-- [ ] **Set up a support email** that a human reads. Both stores require it.
-- [ ] **Assign someone to moderate the `reports` collection.** Apple requires
-      user-generated content to be actually moderated, not just reportable.
-- [ ] **Decide your abuse response.** A public directory of phone numbers
-      attracts spam and harassment. Know in advance how you will remove a bad
-      actor and how quickly.
+Still outstanding — none of these are code problems:
+
+- [ ] **Real donors. This is the blocker.** The database is empty, so a reviewer
+      signing in sees "0 Found". For a Medical-category app that reads as
+      non-functional (Apple 4.2). You chose to seed by open sign-up: recruit
+      **50–100 genuinely consented donors** before submitting. Nothing in the
+      repo can substitute for this, and shipping invented donors with
+      real-format phone numbers is both a store violation and a privacy risk.
+- [ ] **Verify the helplines** in `src/screens/AboutAPScreen.js` by calling
+      them. Only 108 and 104 are listed, because the previous numbers could not
+      be verified. A wrong number in a medical emergency app is dangerous.
+- [ ] **Back up the EAS keystore** — `npx eas-cli credentials -p android`, then
+      store it offline. Lose it and you can never update the Play listing.
+- [ ] **Assign someone to triage the `reports` collection.** Apple requires
+      user-generated content to be actually moderated, not merely reportable.
+      Reports are write-only by design — read them in the Firebase console.
+- [ ] **Decide your abuse response** before launch. A public directory of phone
+      numbers attracts spam and harassment. Know how you remove a bad actor and
+      how fast — the Support page publicly promises 24 hours.
 - [ ] **Add crash reporting** (Sentry has a free tier) — wire it into
-      `ErrorBoundary.componentDidCatch`.
-- [ ] **Test on a real low-end Android device** on a slow connection, which is
-      what most of your users will have.
+      `ErrorBoundary.componentDidCatch`, which currently only logs to console.
+- [ ] **Test on a real low-end Android phone** on a slow connection. That is
+      what most of your users will have, and the emulator hides nothing about
+      jank but everything about network reality.
 
 ---
 

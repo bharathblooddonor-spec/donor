@@ -5,6 +5,7 @@ import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { Header } from './src/components/Header';
 import { BottomNav } from './src/components/BottomNav';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { ProfileModal } from './src/components/ProfileModal';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { RequestsScreen } from './src/screens/RequestsScreen';
@@ -30,6 +31,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [activeTab, setActiveTab] = useState('search');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Fires once with the session restored from AsyncStorage, then on every
   // sign-in/sign-out. Until it fires we cannot tell "signed out" from "not
@@ -107,13 +109,27 @@ export default function App() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ExpoStatusBar style="light" backgroundColor="#D32F2F" />
         <View style={styles.appContainer}>
-          <Header onLogout={handleLogout} onFocus={handleFocus} />
+          <Header
+            onLogout={handleLogout}
+            onFocus={handleFocus}
+            onOpenProfile={() => setIsProfileOpen(true)}
+            currentUser={currentUser}
+          />
 
           <View style={styles.screenContent}>
             <ErrorBoundary>{renderCurrentScreen()}</ErrorBoundary>
           </View>
 
           <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+
+          <ProfileModal
+            visible={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            currentUser={currentUser}
+            onProfileUpdated={() => {
+              setCurrentUser({ ...authService.getCurrentUser() });
+            }}
+          />
         </View>
       </SafeAreaView>
     </SafeAreaProvider>

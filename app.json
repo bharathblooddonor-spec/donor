@@ -7,15 +7,19 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "primaryColor": "#D32F2F",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "imageWidth": 200
+        }
+      ],
       [
         "expo-location",
         {
@@ -23,7 +27,8 @@
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
@@ -42,10 +47,10 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.bharathblooddonor.ap",
-      "versionCode": 1,
+      "versionCode": 4,
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "blockedPermissions": [
         "android.permission.CALL_PHONE",
@@ -55,6 +60,12 @@
         "android.permission.VIBRATE",
         "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cd52e163-ec50-436c-9760-cb19e2165023"
+      }
+    },
+    "owner": "awone"
   }
 }

@@ -150,9 +150,13 @@ export const SearchScreen = () => {
       <View style={styles.fastTrackCard}>
         <View style={styles.fastTrackHeaderRow}>
           <View style={styles.fastTrackBadge}>
-            <Text style={styles.fastTrackBadgeText}>⚡ VIJAYAWADA FAST-TRACK</Text>
+            <Text style={styles.fastTrackBadgeText} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+              ⚡ VIJAYAWADA FAST-TRACK
+            </Text>
           </View>
-          <Text style={styles.regionText}>Krishna / NTR region</Text>
+          <Text style={styles.regionText} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+            Krishna / NTR region
+          </Text>
         </View>
 
         <Text style={styles.fastTrackTitle}>Find Instant Donors in Vijayawada</Text>
@@ -317,22 +321,25 @@ export const SearchScreen = () => {
 
                 <View style={styles.donorMetaColumn}>
                   <View style={styles.donorNameRow}>
-                    <Text style={styles.donorName}>{donor.name}</Text>
+                    {donor.photoURL ? (
+                      <Image source={{ uri: donor.photoURL }} style={styles.donorSmallDp} />
+                    ) : null}
+                    <Text style={styles.donorName} numberOfLines={1}>{donor.name}</Text>
                     {donor.isVerified && <View style={styles.onlineDot} />}
                   </View>
 
                   <View style={styles.locationRow}>
                     <Feather name="map-pin" size={12} color="#64748B" style={{ marginRight: 3 }} />
-                    <Text style={styles.locationText}>{donor.city}, {donor.district}</Text>
+                    <Text style={styles.locationText} numberOfLines={1}>{donor.city}, {donor.district}</Text>
                   </View>
 
                   <Text style={styles.donorDetailsText}>
-                    {donor.age} yrs • {donor.gender}
+                    {donor.age} yrs • {donor.gender || 'Donor'}
                   </Text>
                 </View>
 
                 <View style={styles.availableBadge}>
-                  <Text style={styles.availableText}>{donor.status}</Text>
+                  <Text style={styles.availableText}>{donor.status || 'Available'}</Text>
                 </View>
               </View>
 
@@ -357,7 +364,7 @@ export const SearchScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Feather name="phone" size={15} color="#475569" />
-                  <Text style={styles.actionLabel}>Call</Text>
+                  <Text style={styles.actionLabel} numberOfLines={1} maxFontSizeMultiplier={1.2}>Call</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -368,7 +375,7 @@ export const SearchScreen = () => {
                   accessibilityLabel={`Send an SMS to ${donor.name}`}
                 >
                   <Feather name="message-square" size={15} color="#475569" />
-                  <Text style={styles.actionLabel}>SMS</Text>
+                  <Text style={styles.actionLabel} numberOfLines={1} maxFontSizeMultiplier={1.2}>SMS</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -377,7 +384,7 @@ export const SearchScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                  <Text style={styles.actionLabel}>WhatsApp</Text>
+                  <Text style={styles.actionLabel} numberOfLines={1} maxFontSizeMultiplier={1.2}>WhatsApp</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -386,7 +393,7 @@ export const SearchScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Feather name="share-2" size={15} color="#475569" />
-                  <Text style={styles.actionLabel}>Share</Text>
+                  <Text style={styles.actionLabel} numberOfLines={1} maxFontSizeMultiplier={1.2}>Share</Text>
                 </TouchableOpacity>
               </View>
 
@@ -448,9 +455,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
     marginBottom: 8,
   },
   fastTrackBadge: {
+    flexShrink: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -462,6 +472,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   regionText: {
+    flexShrink: 1,
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 11,
     fontWeight: '600',
@@ -670,6 +681,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  donorSmallDp: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#D32F2F',
+  },
   donorName: {
     fontSize: 14,
     fontWeight: '700',
@@ -730,8 +748,11 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: '#f8fafc',
-    height: 40,
+    minHeight: 44,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -743,6 +764,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#475569',
+    textAlign: 'center',
   },
   reportFooter: {
     flexDirection: 'row',

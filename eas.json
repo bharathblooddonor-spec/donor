@@ -8,38 +8,41 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:5000/api"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBj4aFSH1MLbODzBn8cCNOSuVNxJp8td6k",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bharath-blood-donor.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bharath-blood-donor",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bharath-blood-donor.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "651658569692",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:651658569692:web:51fc4cfcd4e0ab08659119"
       },
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": true
-      }
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging-api.example.com/api"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBj4aFSH1MLbODzBn8cCNOSuVNxJp8td6k",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bharath-blood-donor.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bharath-blood-donor",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bharath-blood-donor.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "651658569692",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:651658569692:web:51fc4cfcd4e0ab08659119"
       },
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": true
-      }
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.example.com/api"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBj4aFSH1MLbODzBn8cCNOSuVNxJp8td6k",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bharath-blood-donor.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bharath-blood-donor",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bharath-blood-donor.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "651658569692",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:651658569692:web:51fc4cfcd4e0ab08659119"
       },
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "ios": {
-        "distribution": "store"
-      }
+      "android": { "buildType": "app-bundle" },
+      "ios": { "distribution": "store" }
     }
   },
   "submit": {

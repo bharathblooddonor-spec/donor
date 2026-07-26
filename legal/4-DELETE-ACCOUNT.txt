@@ -1,0 +1,94 @@
+DELETE YOUR ACCOUNT AND DATA
+Bharath Blood Donor
+
+Last updated: 26 July 2026
+
+
+This page explains how to delete your Bharath Blood Donor account and what
+happens to your data when you do.
+
+
+HOW TO DELETE YOUR ACCOUNT FROM INSIDE THE APP
+
+This is the fastest way and it takes effect immediately.
+
+  1. Open the Bharath Blood Donor app and sign in.
+  2. Tap "About" in the bottom navigation bar.
+  3. Scroll to the "Your Account" section.
+  4. Tap "Delete my account".
+  5. Enter your password to confirm it is really you.
+  6. Confirm the warning. Your account is deleted straight away.
+
+Deletion is permanent. We cannot restore a deleted account, and you will need
+to register again from scratch if you want to use the app later.
+
+
+HOW TO REQUEST DELETION BY EMAIL
+
+If you cannot sign in — for example you have forgotten your password or lost
+access to your email address — write to us instead.
+
+  Email: bharathblooddonor@gmail.com
+  Subject: Delete my account
+
+Include the email address you registered with, and, if you were listed as a
+donor, the phone number on your listing so we can identify the right record.
+
+We will verify that the request genuinely comes from the account holder before
+we delete anything, then confirm by email once it is done. We respond within
+30 days of receiving your request.
+
+
+WHAT IS DELETED
+
+When your account is deleted, the following is erased permanently and
+immediately:
+
+  - Your login account, including your email address and password hash
+  - Your profile: display name, district and blood group
+  - Your donor listing in full, if you had one: name, age, gender, blood
+    group, district, city, phone number, availability status and last
+    donation period
+
+Once deleted, this data is gone from our live systems and you will no longer
+appear in any donor search.
+
+
+WHAT IS KEPT, AND FOR HOW LONG
+
+  - Emergency blood requests you posted are NOT removed automatically when
+    you delete your account. A live request may still be helping a patient
+    find blood, so we do not withdraw it without being asked. Each request
+    contains the patient name, blood group, units needed, hospital name and
+    location, contact name and phone number, and the reason for the request.
+    If you want your requests removed as well, say so in your deletion email
+    and we will delete them too. Otherwise they are removed [YOUR RETENTION
+    PERIOD - we recommend 30 days after the date needed].
+
+  - Reports you submitted about abusive or fake listings are kept for
+    [YOUR RETENTION PERIOD] so that we can detect repeat offenders. These
+    are visible only to our moderation team and are not linked to your
+    listing once your account is gone.
+
+  - Routine encrypted backups held by our infrastructure provider, Google
+    Firebase, may retain a copy for a short period before they expire. These
+    backups are never used to restore a deleted account and are not
+    accessible to us for any other purpose.
+
+We keep no other copy of your personal data after deletion.
+
+
+DELETING YOUR DONOR LISTING WITHOUT DELETING YOUR ACCOUNT
+
+If you only want to stop appearing in donor searches but wish to keep your
+account, open About, then "Your Account", then tap "Hide my donor listing".
+Your listing stops appearing in searches and you can list yourself again at
+any time.
+
+
+MORE INFORMATION
+
+Our full privacy policy explains everything we collect and why:
+https://docs.google.com/document/d/e/2PACX-1vTeKx70Xt4hB7SVm5LImjYxpJDRMcmuIxJVZCNt1iAu_oPKp2jpsr6xGvJ6WS1WYfpZdCwC9tOtSUCx/pub
+
+Questions about deletion: bharathblooddonor@gmail.com

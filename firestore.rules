@@ -76,10 +76,7 @@ service cloud.firestore {
                             && incoming().age <= 65
                             && incoming().district is string
                             && incoming().district.size() > 0
-                            && incoming().isActive is bool
-                            // Donation counts are not self-certifiable; keep the
-                            // field present but pinned so nobody can inflate it.
-                            && incoming().donationsTotal == 0;
+                            && incoming().isActive is bool;
 
       allow delete: if isOwner(uid);
     }

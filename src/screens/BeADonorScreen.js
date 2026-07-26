@@ -129,7 +129,9 @@ export const BeADonorScreen = ({ onRegistered }) => {
         />
 
         <View style={styles.row}>
-          <View style={{ width: 100 }}>
+          {/* Proportional rather than a fixed 100px: on a 320dp screen a fixed
+              width plus the blood-group picker overflows the row. */}
+          <View style={styles.ageField}>
             <Text style={styles.label}>Age *</Text>
             <TextInput
               style={styles.input}
@@ -337,8 +339,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  flex1: {
+  ageField: {
     flex: 1,
+    minWidth: 0,
+    maxWidth: 110,
+  },
+  flex1: {
+    flex: 2,
+    minWidth: 0,
   },
   phoneInputWrapper: {
     flexDirection: 'row',
