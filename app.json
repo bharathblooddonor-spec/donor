@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "primaryColor": "#D32F2F",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -14,12 +15,25 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Bharath Blood Donor uses your location only to pre-fill your district and city so you can find nearby donors faster. Your coordinates are never stored or shared.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bharathblooddonor.ap",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Bharath Blood Donor requires location access to connect you with emergency blood donors nearby in Andhra Pradesh.",
-        "NSPhotoLibraryUsageDescription": "Allow app to upload donor profile images."
+        "NSLocationWhenInUseUsageDescription": "Bharath Blood Donor uses your location only to pre-fill your district and city so you can find nearby donors faster. Your coordinates are never stored or shared."
       }
     },
     "android": {
@@ -28,16 +42,19 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.bharathblooddonor.ap",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "CALL_PHONE"
+        "ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.CALL_PHONE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
-    },
-    "extra": {
-      "eas": {
-        "projectId": "bharath-blood-donor-ap-001"
-      }
     }
   }
 }

@@ -1,3 +1,13 @@
+/**
+ * Static reference data for Andhra Pradesh — the 26 districts as reorganised in
+ * 2022, and the blood groups the app supports.
+ *
+ * This file holds reference data only. Donor and request records come from the
+ * backend; there is deliberately no seed/demo data here, because shipping
+ * fabricated donor listings with real-format phone numbers is both a store
+ * policy violation and a privacy risk.
+ */
+
 export const apDistricts = [
   "NTR",
   "Krishna",
@@ -32,17 +42,28 @@ export const apCitiesByDistrict = {
   "Krishna": ["Machilipatnam", "Gudivada", "Pamarru", "Pedana", "Vuyyuru", "Challapalli"],
   "Guntur": ["Guntur City", "Tenali", "Mangalagiri", "Ponnur", "Tadikonda", "Amaravati"],
   "Visakhapatnam": ["Visakhapatnam", "Gajuwaka", "MVP Colony", "Madhurawada", "Pendurthi", "Bheemunipatnam"],
-  "Tirupati": ["Tirupati City", "Srikalahasti", "Gudur", "Sullurpeta", "Chandragiri", "Venkatagiri"],
+  "Tirupati": ["Tirupati City", "Srikalahasti", "Gudur", "Sullurpeta", "Chandragiri", "Venkatagiri", "Naidupeta"],
   "Kurnool": ["Kurnool City", "Adoni", "Yemmiganur", "Kodumur", "Pattikonda"],
   "SPS Nellore": ["Nellore City", "Kavali", "Atmakur", "Kovur", "Kandukur"],
-  "East Godavari": ["Rajahmundry", "Kovvur", "Nidadavole", "Anaparthi"],
+  "East Godavari": ["Rajahmundry", "Kovvur", "Nidadavole", "Anaparthi", "Gokavaram", "Seethanagaram"],
   "Kakinada": ["Kakinada City", "Samalkota", "Pithapuram", "Tuni", "Peddapuram"],
-  "West Godavari": ["Bhimavaram", "Tadepalligudem", "Tanuku", "Narsapuram"],
+  "West Godavari": ["Bhimavaram", "Tadepalligudem", "Tanuku", "Narsapuram", "Palakollu"],
   "Eluru": ["Eluru City", "Jangareddigudem", "Nuzvid", "Chintalapudi"],
-  "Prakasam": ["Ongole", "Chirala", "Markapur", "Giddalur"],
-  "Ananthapuramu": ["Anantapur City", "Dharmavaram", "Guntakal", "Tadipatri", "Kadiri"],
+  "Prakasam": ["Ongole", "Markapur", "Giddalur", "Darsi", "Kanigiri"],
+  "Ananthapuramu": ["Anantapur City", "Guntakal", "Tadipatri", "Rayadurg", "Kalyandurg", "Uravakonda"],
   "YSR Kadapa": ["Kadapa City", "Proddatur", "Jammalamadugu", "Pulivendula", "Badvel"],
-  "Chittoor": ["Chittoor City", "Madanapalle", "Punganur", "Nagari", "Palamaner"]
+  "Chittoor": ["Chittoor City", "Punganur", "Nagari", "Palamaner", "Kuppam", "Bangarupalem"],
+  "Vizianagaram": ["Vizianagaram", "Bobbili", "Cheepurupalli", "Gajapathinagaram", "Nellimarla", "Salur"],
+  "Srikakulam": ["Srikakulam", "Amadalavalasa", "Ichchapuram", "Palasa", "Rajam", "Tekkali"],
+  "Bapatla": ["Bapatla", "Chirala", "Repalle", "Addanki", "Parchur", "Vetapalem"],
+  "Palnadu": ["Narasaraopet", "Sattenapalle", "Chilakaluripet", "Gurazala", "Macherla", "Piduguralla"],
+  "Anakapalli": ["Anakapalli", "Narsipatnam", "Yelamanchili", "Chodavaram", "Madugula"],
+  "Alluri Sitharama Raju": ["Paderu", "Rampachodavaram", "Chintapalli", "Araku Valley", "Chintoor"],
+  "Parvathipuram Manyam": ["Parvathipuram", "Palakonda", "Kurupam", "Seethampeta", "Gummalakshmipuram"],
+  "Dr. B.R. Ambedkar Konaseema": ["Amalapuram", "Ramachandrapuram", "Mummidivaram", "Kothapeta", "Razole"],
+  "Nandyal": ["Nandyal", "Dhone", "Allagadda", "Banaganapalle", "Atmakur", "Nandikotkur"],
+  "Sri Sathya Sai": ["Puttaparthi", "Dharmavaram", "Kadiri", "Hindupur", "Penukonda", "Madakasira"],
+  "Annamayya": ["Rayachoti", "Madanapalle", "Rajampet", "Pileru", "Thamballapalle"]
 };
 
 export const apBloodGroups = [
@@ -65,125 +86,4 @@ export const apBloodGroups = [
   "Bombay Phenotype (Oh+)",
   "Bombay Phenotype (Oh-)",
   "Rh-null (Golden)"
-];
-
-export const initialDonors = [
-  {
-    id: "donor-1",
-    name: "Srinivasa Rao",
-    bloodGroup: "O+",
-    district: "NTR",
-    city: "Vijayawada",
-    age: 29,
-    gender: "Male",
-    status: "Available",
-    donationsTotal: 12,
-    lastDonated: "2026-03-10",
-    phone: "+919848012345",
-    isVerified: true
-  },
-  {
-    id: "donor-2",
-    name: "Venkata Ramana",
-    bloodGroup: "O+",
-    district: "NTR",
-    city: "Vijayawada",
-    age: 32,
-    gender: "Male",
-    status: "Available",
-    donationsTotal: 8,
-    lastDonated: "2026-01-15",
-    phone: "+919848098765",
-    isVerified: true
-  },
-  {
-    id: "donor-3",
-    name: "Lakshmi Prasanna",
-    bloodGroup: "B+",
-    district: "NTR",
-    city: "Vijayawada",
-    age: 26,
-    gender: "Female",
-    status: "Available",
-    donationsTotal: 5,
-    lastDonated: "2025-11-20",
-    phone: "+919949911223",
-    isVerified: true
-  },
-  {
-    id: "donor-4",
-    name: "Kiran Kumar Reddy",
-    bloodGroup: "AB-",
-    district: "Guntur",
-    city: "Guntur City",
-    age: 35,
-    gender: "Male",
-    status: "Available",
-    donationsTotal: 15,
-    lastDonated: "2026-02-01",
-    phone: "+919849055443",
-    isVerified: true
-  },
-  {
-    id: "donor-5",
-    name: "Dr. P. V. Naidu",
-    bloodGroup: "Bombay Phenotype (Oh+)",
-    district: "Visakhapatnam",
-    city: "Visakhapatnam",
-    age: 41,
-    gender: "Male",
-    status: "Available",
-    donationsTotal: 9,
-    lastDonated: "2025-09-10",
-    phone: "+919440077889",
-    isVerified: true
-  }
-];
-
-export const initialRequests = [
-  {
-    id: "req-1",
-    patientName: "Subbaiah Sastry",
-    bloodGroup: "AB-",
-    hospitalName: "Ramesh Hospitals, Vijayawada",
-    district: "NTR",
-    city: "Vijayawada",
-    units: 3,
-    reason: "Cardiac Surgery Emergency",
-    contactName: "Narayana (Son)",
-    phone: "+919948512121",
-    dateNeeded: "2026-07-04",
-    isUrgent: true,
-    fulfilled: false
-  },
-  {
-    id: "req-2",
-    patientName: "Baby of Sireesha",
-    bloodGroup: "O-",
-    hospitalName: "Rainbow Children Hospital, Vijayawada",
-    district: "NTR",
-    city: "Vijayawada",
-    units: 2,
-    reason: "Neonatal Jaundice Exchange Transfusion",
-    contactName: "Gopi (Father)",
-    phone: "+919177199000",
-    dateNeeded: "2026-07-05",
-    isUrgent: true,
-    fulfilled: false
-  },
-  {
-    id: "req-3",
-    patientName: "Ramaswamy Reddi",
-    bloodGroup: "A1+",
-    hospitalName: "GGH Guntur Emergency Ward",
-    district: "Guntur",
-    city: "Guntur City",
-    units: 2,
-    reason: "Road Accident Trauma Emergency",
-    contactName: "Siva Reddi (Brother)",
-    phone: "+919848033221",
-    dateNeeded: "2026-07-20",
-    isUrgent: true,
-    fulfilled: false
-  }
 ];

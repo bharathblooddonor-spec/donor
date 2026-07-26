@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// Bharath Blood Donor — Firestore security rules.
+//
+// This file IS the backend. The Spark (free) plan has no Cloud Functions, so
+// every authorization and validation check has to happen here, on Google's
+// servers. The client SDK is not a security boundary: anyone can extract the
+// Firebase config from the APK and call Firestore directly, so assume every
+// request is hostile and written by hand.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+// Test with:    firebase emulators:start --only firestore
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Donor listings expose a phone number, so reads require a signed-in
+    // account. This does not make scraping impossible, but it removes anonymous
+    // bulk harvesting and gives you a uid to rate-limit or ban.
+    function canReadDirectory() {
+      return isSignedIn();
+    }
+
+    function isValidBloodGroup(value) {
+      return value in [
+        'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-',
+        'A1+', 'A1-', 'A2+', 'A2-', 'A1B+', 'A1B-', 'A2B+', 'A2B-',
+        'Bombay Phenotype (Oh+)', 'Bombay Phenotype (Oh-)', 'Rh-null (Golden)'
+      ];
+    }
+
+    // Indian mobile: 10 digits starting 6-9, optional +91 country code.
+    function isValidPhone(value) {
+      return value is string && value.matches('^(\\+?91)?[6-9][0-9]{9}$');
+    }
+
+    function isValidName(value) {
+      return value is string && value.size() >= 2 && value.size() <= 80;
+    }
+
+    // ---- users -------------------------------------------------------------
+    // Private profile. Only ever readable and writable by its owner.
+    match /users/{uid} {
+      allow read, update, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && incoming().uid == uid
+                    && incoming().email == request.auth.token.email;
+    }
+
+    // ---- donors ------------------------------------------------------------
+    // One listing per account, document id == uid. That constraint is what
+    // stops a single account from flooding the directory with fake donors.
+    match /donors/{uid} {
+      allow read: if canReadDirectory();
+
+      allow create, update: if isOwner(uid)
+                            && incoming().uid == uid
+                            && isValidName(incoming().name)
+                            && isValidPhone(incoming().phone)
+                            && isValidBloodGroup(incoming().bloodGroup)
+                            // Blood donation in India is limited to ages 18-65.
+                            && incoming().age is int
+                            && incoming().age >= 18
+                            && incoming().age <= 65
+                            && incoming().district is string
+                            && incoming().district.size() > 0
+                            && incoming().isActive is bool
+                            // Donation counts are not self-certifiable; keep the
+                            // field present but pinned so nobody can inflate it.
+                            && incoming().donationsTotal == 0;
+
+      allow delete: if isOwner(uid);
+    }
+
+    // ---- requests ----------------------------------------------------------
+    // Emergency blood requests. Anyone signed in may post; only the poster may
+    // change their own, and only to mark it fulfilled.
+    match /requests/{requestId} {
+      allow read: if canReadDirectory();
+
+      allow create: if isSignedIn()
+                    && incoming().uid == request.auth.uid
+                    && isValidName(incoming().patientName)
+                    && isValidPhone(incoming().phone)
+                    && isValidBloodGroup(incoming().bloodGroup)
+                    && incoming().hospitalName is string
+                    && incoming().hospitalName.size() >= 3
+                    && incoming().units is int
+                    && incoming().units >= 1
+                    && incoming().units <= 20
+                    && incoming().fulfilled == false;
+
+      // Restrict updates to the fulfilment fields so a poster cannot silently
+      // rewrite a live request into something else after it has been seen.
+      allow update: if isOwner(resource.data.uid)
+                    && request.resource.data.diff(resource.data)
+                         .affectedKeys()
+                         .hasOnly(['fulfilled', 'fulfilledAt']);
+
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    // ---- reports -----------------------------------------------------------
+    // Write-only moderation queue. Reports are deliberately unreadable by
+    // clients so nobody can enumerate who reported whom; triage them from the
+    // Firebase console.
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+                    && incoming().listingId is string
+                    && incoming().listingType in ['donor', 'request']
+                    && incoming().reportedBy == request.auth.uid
+                    && incoming().status == 'open';
+
+      allow read, update, delete: if false;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

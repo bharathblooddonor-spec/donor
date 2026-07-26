@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apBloodGroups } from '../data/apData';
 import { apiService } from '../api/apiService';
@@ -10,28 +10,45 @@ export const RequestsScreen = () => {
   const [selectedBloodGroup, setSelectedBloodGroup] = useState('All Blood Groups');
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchRequests = async () => {
+  const requestIdRef = useRef(0);
+
+  const fetchRequests = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(null);
+
     try {
       const data = await apiService.getRequests({
         district: selectedDistrict,
         bloodGroup: selectedBloodGroup
       });
+      if (requestId !== requestIdRef.current) return;
       setRequests(data);
     } catch (e) {
-      console.error(e);
+      if (requestId !== requestIdRef.current) return;
+      setRequests([]);
+      setError(e.message || 'Something went wrong while loading requests.');
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  };
+  }, [selectedDistrict, selectedBloodGroup]);
 
   useEffect(() => {
     fetchRequests();
-  }, [selectedDistrict, selectedBloodGroup]);
+  }, [fetchRequests]);
 
   const handlePostRequest = async (newRequestData) => {
-    await apiService.createRequest(newRequestData);
-    fetchRequests();
-    Alert.alert('Success', 'Your emergency request has been broadcasted across AP!');
+    try {
+      await apiService.createRequest(newRequestData);
+      Alert.alert('Success', 'Your emergency request has been broadcast across AP.');
+      fetchRequests();
+    } catch (e) {
+      Alert.alert('Could not post request', e.message || 'Please try again.');
+    }
   };
 
   const handleIDonate = (req) => {
@@ -43,9 +60,39 @@ export const RequestsScreen = () => {
   };
 
   const handleMarkFulfilled = async (id) => {
-    await apiService.fulfillRequest(id);
-    fetchRequests();
-    Alert.alert('Thank you', 'Request marked as fulfilled.');
+    try {
+      await apiService.fulfillRequest(id);
+      Alert.alert('Thank you', 'Request marked as fulfilled.');
+      fetchRequests();
+    } catch (e) {
+      Alert.alert('Could not update request', e.message || 'Please try again.');
+    }
+  };
+
+  const handleReportRequest = (item) => {
+    Alert.alert(
+      'Report this request',
+      `Report the request for ${item.patientName} as fake, resolved, or abusive? Our team reviews every report.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.reportListing({
+                listingType: 'request',
+                listingId: item.id,
+                reason: 'Reported from emergency board',
+              });
+              Alert.alert('Thank you', 'This request has been reported for review.');
+            } catch (e) {
+              Alert.alert('Could not send report', e.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const bloodGroupOptions = ['All Blood Groups', ...apBloodGroups];
@@ -101,7 +148,41 @@ export const RequestsScreen = () => {
 
       {/* Requests List */}
       <View style={styles.requestsList}>
-        {requests.map((item) => (
+        {loading && (
+          <View style={styles.stateBox}>
+            <ActivityIndicator size="large" color="#D32F2F" />
+            <Text style={styles.stateTitle}>Loading emergency requests…</Text>
+          </View>
+        )}
+
+        {!loading && error && (
+          <View style={[styles.stateBox, styles.errorBox]}>
+            <Feather name="wifi-off" size={32} color="#D32F2F" />
+            <Text style={styles.errorTitle}>Could not load requests</Text>
+            <Text style={styles.stateSub}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={fetchRequests}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+            >
+              <Feather name="refresh-cw" size={14} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !error && requests.length === 0 && (
+          <View style={styles.stateBox}>
+            <Feather name="inbox" size={32} color="#94a3b8" />
+            <Text style={styles.stateTitle}>No active requests</Text>
+            <Text style={styles.stateSub}>
+              There are no open blood requests matching these filters right now.
+            </Text>
+          </View>
+        )}
+
+        {!loading && !error && requests.map((item) => (
           <View key={item.id} style={[styles.requestCard, item.fulfilled && styles.fulfilledCard]}>
             <View style={styles.cardTopRow}>
               <View style={styles.bloodReqCircle}>
@@ -180,7 +261,13 @@ export const RequestsScreen = () => {
               </View>
             ) : null}
 
-            <TouchableOpacity style={styles.reportFooter} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.reportFooter}
+              onPress={() => handleReportRequest(item)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Report the request for ${item.patientName}`}
+            >
               <Feather name="flag" size={11} color="#94a3b8" style={{ marginRight: 4 }} />
               <Text style={styles.reportText}>Report request</Text>
             </TouchableOpacity>
@@ -265,6 +352,51 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  stateBox: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  errorBox: {
+    borderColor: '#fee2e2',
+  },
+  stateTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: 8,
+  },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991b1b',
+    marginTop: 8,
+  },
+  stateSub: {
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: 8,
+    marginTop: 14,
+  },
+  retryBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   requestsList: {
     gap: 14,

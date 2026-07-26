@@ -104,15 +104,45 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Credentials come from android/keystore.properties (git-ignored) or
+            // from environment variables in CI. Never commit the keystore.
+            // See DEPLOYMENT.md for how to generate one.
+            def keystorePropertiesFile = rootProject.file('keystore.properties')
+
+            if (keystorePropertiesFile.exists()) {
+                def keystoreProperties = new Properties()
+                keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            } else if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Fail loudly rather than silently shipping a debug-signed bundle,
+            // which the Play Console rejects on upload.
+            def hasReleaseKeystore = rootProject.file('keystore.properties').exists() ||
+                    System.getenv('ANDROID_KEYSTORE_PATH')
+
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn('WARNING: no release keystore configured — falling back to the ' +
+                        'debug keystore. This build CANNOT be uploaded to Google Play. ' +
+                        'See DEPLOYMENT.md.')
+                signingConfig signingConfigs.debug
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

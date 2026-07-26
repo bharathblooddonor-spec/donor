@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, Share } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, Share, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { apiService } from '../api/apiService';
+import { detectDistrictAndCity } from '../utils/location';
 import { NativePicker } from '../components/NativePicker';
 
 export const SearchScreen = () => {
@@ -11,45 +12,107 @@ export const SearchScreen = () => {
   const [city, setCity] = useState('Vijayawada');
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [gpsStatus, setGpsStatus] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
 
-  const handleSearch = async () => {
+  // Guards against an older, slower response overwriting a newer one.
+  const requestIdRef = useRef(0);
+
+  const runSearch = useCallback(async (criteria) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError(null);
+
     try {
-      const results = await apiService.getDonors({
-        district,
-        city,
-        bloodGroup: selectedBloodGroup
-      });
+      const results = await apiService.getDonors(criteria);
+      if (requestId !== requestIdRef.current) return;
       setDonors(results);
     } catch (e) {
-      console.error(e);
+      if (requestId !== requestIdRef.current) return;
+      setDonors([]);
+      setError(e.message || 'Something went wrong while searching for donors.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setHasSearched(true);
+      }
     }
-  };
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    runSearch({ district, city, bloodGroup: selectedBloodGroup });
+  }, [runSearch, district, city, selectedBloodGroup]);
 
   useEffect(() => {
     handleSearch();
+    // Initial load only — subsequent searches are explicit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pass the new criteria explicitly: setState is async, so reading `district`
+  // and `selectedBloodGroup` here would search with the previous values.
   const handleFastTrack = (bg) => {
     setSelectedBloodGroup(bg);
     setDistrict('NTR');
     setCity('Vijayawada');
-    handleSearch();
+    runSearch({ district: 'NTR', city: 'Vijayawada', bloodGroup: bg });
   };
 
-  const handleUseLocation = () => {
-    setGpsStatus('GPS Location Detected: Vijayawada, NTR District');
-    setDistrict('NTR');
-    setCity('Vijayawada');
+  const handleUseLocation = async () => {
+    setGpsLoading(true);
+    setGpsStatus('');
+    try {
+      const detected = await detectDistrictAndCity();
+      setDistrict(detected.district);
+      if (detected.city) setCity(detected.city);
+      setGpsStatus(detected.label);
+    } catch (e) {
+      setGpsStatus('');
+      Alert.alert('Location unavailable', e.message);
+    } finally {
+      setGpsLoading(false);
+    }
   };
 
   const handleActionCall = (phone) => {
     Linking.openURL(`tel:${phone}`).catch(() => {
-      Alert.alert('Phone Call', `Dialing ${phone}`);
+      Alert.alert('Unable to place call', `Please dial ${phone} manually.`);
     });
+  };
+
+  const handleActionSms = (phone, bg) => {
+    const body = `Hello, I found your listing on Bharath Blood Donor AP. We urgently need ${bg} blood. Are you available to donate?`;
+    Linking.openURL(`sms:${phone}?body=${encodeURIComponent(body)}`).catch(() => {
+      Alert.alert('Unable to open messages', `Please text ${phone} manually.`);
+    });
+  };
+
+  const handleReportListing = (donor) => {
+    Alert.alert(
+      'Report this listing',
+      `Report ${donor.name}'s listing as inaccurate, fake, or abusive? Our team reviews every report.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.reportListing({
+                listingType: 'donor',
+                listingId: donor.id,
+                reason: 'Reported from donor search',
+              });
+              Alert.alert('Thank you', 'This listing has been reported for review.');
+            } catch (e) {
+              Alert.alert('Could not send report', e.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleActionWhatsApp = (phone, name, bg) => {
@@ -164,16 +227,42 @@ export const SearchScreen = () => {
         />
 
         {/* GPS Location Button */}
-        <TouchableOpacity style={styles.locationBtn} onPress={handleUseLocation} activeOpacity={0.8}>
-          <Feather name="target" size={15} color="#D32F2F" style={{ marginRight: 6 }} />
-          <Text style={styles.locationBtnText}>Use My Current Location</Text>
+        <TouchableOpacity
+          style={[styles.locationBtn, gpsLoading && styles.locationBtnDisabled]}
+          onPress={handleUseLocation}
+          disabled={gpsLoading}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Detect my district and city using GPS"
+        >
+          {gpsLoading ? (
+            <ActivityIndicator size="small" color="#D32F2F" style={{ marginRight: 6 }} />
+          ) : (
+            <Feather name="target" size={15} color="#D32F2F" style={{ marginRight: 6 }} />
+          )}
+          <Text style={styles.locationBtnText}>
+            {gpsLoading ? 'Detecting location…' : 'Use My Current Location'}
+          </Text>
         </TouchableOpacity>
         {gpsStatus ? <Text style={styles.gpsStatusText}>{gpsStatus}</Text> : null}
 
         {/* Search Donors Submit Button */}
-        <TouchableOpacity style={styles.searchSubmitBtn} onPress={handleSearch} activeOpacity={0.85}>
-          <Feather name="search" size={17} color="#ffffff" style={{ marginRight: 8 }} />
-          <Text style={styles.searchSubmitText}>Search Blood Donors</Text>
+        <TouchableOpacity
+          style={[styles.searchSubmitBtn, loading && styles.searchSubmitBtnDisabled]}
+          onPress={handleSearch}
+          disabled={loading}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Search blood donors"
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+          ) : (
+            <Feather name="search" size={17} color="#ffffff" style={{ marginRight: 8 }} />
+          )}
+          <Text style={styles.searchSubmitText}>
+            {loading ? 'Searching…' : 'Search Blood Donors'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -182,14 +271,36 @@ export const SearchScreen = () => {
         <Text style={styles.resultsTitle}>
           {selectedBloodGroup} DONORS IN {city.toUpperCase()}
         </Text>
-        <View style={styles.foundBadge}>
-          <Text style={styles.foundBadgeText}>{donors.length} Found</Text>
-        </View>
+        {!loading && !error && hasSearched ? (
+          <View style={styles.foundBadge}>
+            <Text style={styles.foundBadgeText}>{donors.length} Found</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Donors List */}
       <View style={styles.donorList}>
-        {donors.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color="#D32F2F" />
+            <Text style={styles.emptyTitle}>Searching donors…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorState}>
+            <Feather name="wifi-off" size={32} color="#D32F2F" />
+            <Text style={styles.errorTitle}>Could not load donors</Text>
+            <Text style={styles.errorSub}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={handleSearch}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+            >
+              <Feather name="refresh-cw" size={14} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : donors.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="alert-circle" size={32} color="#94a3b8" />
             <Text style={styles.emptyTitle}>No matching donors found</Text>
@@ -251,8 +362,10 @@ export const SearchScreen = () => {
 
                 <TouchableOpacity
                   style={styles.actionBtn}
-                  onPress={() => handleActionCall(donor.phone)}
+                  onPress={() => handleActionSms(donor.phone, donor.bloodGroup)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Send an SMS to ${donor.name}`}
                 >
                   <Feather name="message-square" size={15} color="#475569" />
                   <Text style={styles.actionLabel}>SMS</Text>
@@ -277,7 +390,13 @@ export const SearchScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.reportFooter} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.reportFooter}
+                onPress={() => handleReportListing(donor)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${donor.name}'s listing`}
+              >
                 <Feather name="flag" size={11} color="#94a3b8" style={{ marginRight: 4 }} />
                 <Text style={styles.reportText}>Report listing</Text>
               </TouchableOpacity>
@@ -457,6 +576,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  locationBtnDisabled: {
+    opacity: 0.6,
+  },
   gpsStatusText: {
     fontSize: 11,
     color: '#16a34a',
@@ -471,6 +593,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchSubmitBtnDisabled: {
+    opacity: 0.7,
   },
   searchSubmitText: {
     color: '#ffffff',
@@ -645,5 +770,41 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginTop: 3,
+  },
+  errorState: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+  },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991b1b',
+    marginTop: 8,
+  },
+  errorSub: {
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: 8,
+    marginTop: 14,
+  },
+  retryBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

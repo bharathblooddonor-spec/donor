@@ -27,9 +27,24 @@ yarn-error.log*
 .env
 .env.local
 
+# Signing secrets — never commit these. Losing the upload keystore means you can
+# never update the app under the same Play listing again, so back it up offline.
+android/keystore.properties
+*.keystore
+!android/app/debug.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+play-service-account.json
+
+# IDE
+.idea/
+.vscode/
+
 # OS
 .DS_Store
 Thumbs.db
-*.apk  
-*.aab  
-*.ipa  
+*.apk
+*.aab
+*.ipa

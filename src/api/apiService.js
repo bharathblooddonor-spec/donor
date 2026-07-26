@@ -1,130 +1,226 @@
-import { initialDonors, initialRequests } from '../data/apData';
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+/**
+ * Firestore data layer.
+ *
+ * Authorization is enforced by firestore.rules on Google's servers, not here —
+ * treat everything in this file as a convenience wrapper, not a security
+ * boundary. A modified client can call Firestore directly.
+ */
 
-// Helper to handle API requests with automatic offline fallback
-async function fetchApi(endpoint, options = {}) {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+const MAX_RESULTS = 100;
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      }
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.warn(`Backend API unreachable at ${endpoint}, falling back to local database.`, error.message);
-    return null;
+export class ApiError extends Error {
+  constructor(message, options) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = options?.code ?? null;
   }
 }
 
-// Memory cache fallback store
-let localDonors = [...initialDonors];
-let localRequests = [...initialRequests];
+function toApiError(error, fallback) {
+  if (error?.code === 'permission-denied') {
+    return new ApiError('You do not have permission to do that.', { code: error.code });
+  }
+  if (error?.code === 'unavailable') {
+    return new ApiError(
+      'Could not reach the server. Check your internet connection and try again.',
+      { code: error.code }
+    );
+  }
+  if (error?.code === 'failed-precondition') {
+    // Almost always a missing composite index — the console logs a create link.
+    return new ApiError(
+      'This search is not available yet. Please try a broader filter.',
+      { code: error.code }
+    );
+  }
+  return new ApiError(fallback, { code: error?.code });
+}
+
+/** Firestore Timestamps do not survive into React state usefully. */
+function serialise(snapshot) {
+  const data = snapshot.data();
+  const plain = { id: snapshot.id };
+
+  for (const [key, value] of Object.entries(data)) {
+    plain[key] = value?.toDate ? value.toDate().toISOString() : value;
+  }
+  return plain;
+}
 
 export const apiService = {
-  // Search donors
+  /**
+   * Firestore allows only one range/inequality field per query and has no
+   * substring matching, so district and bloodGroup are filtered server-side
+   * (both exact equality, backed by a composite index) and city is narrowed
+   * client-side over that already-small result set.
+   */
   async getDonors({ district, city, bloodGroup }) {
-    const apiRes = await fetchApi(`/donors?district=${encodeURIComponent(district || '')}&city=${encodeURIComponent(city || '')}&bloodGroup=${encodeURIComponent(bloodGroup || '')}`);
-    if (apiRes && apiRes.success) {
-      return apiRes.donors;
-    }
+    try {
+      const constraints = [where('isActive', '==', true)];
 
-    // Local fallback filter
-    let results = [...localDonors];
-    if (bloodGroup && bloodGroup !== 'All') {
-      results = results.filter(d => d.bloodGroup.toLowerCase() === bloodGroup.toLowerCase());
+      if (district && district !== 'All' && district !== 'All Districts') {
+        constraints.push(where('district', '==', district));
+      }
+      if (bloodGroup && bloodGroup !== 'All' && bloodGroup !== 'All Blood Groups') {
+        constraints.push(where('bloodGroup', '==', bloodGroup));
+      }
+
+      const snapshot = await getDocs(
+        query(collection(db, 'donors'), ...constraints, limit(MAX_RESULTS))
+      );
+
+      let donors = snapshot.docs.map(serialise);
+
+      if (city && city.trim()) {
+        const needle = city.trim().toLowerCase();
+        donors = donors.filter((d) => (d.city || '').toLowerCase().includes(needle));
+      }
+
+      return donors;
+    } catch (error) {
+      throw toApiError(error, 'Could not load donors. Please try again.');
     }
-    if (district && district !== 'All') {
-      results = results.filter(d => d.district.toLowerCase() === district.toLowerCase());
-    }
-    if (city && city.trim()) {
-      results = results.filter(d => d.city.toLowerCase().includes(city.toLowerCase()));
-    }
-    return results;
   },
 
-  // Register new donor
+  /**
+   * One donor listing per account, keyed by uid — re-registering updates the
+   * existing listing instead of creating duplicates.
+   */
   async registerDonor(donorData) {
-    const apiRes = await fetchApi('/donors/register', {
-      method: 'POST',
-      body: JSON.stringify(donorData)
-    });
-
-    if (apiRes && apiRes.success) {
-      return apiRes.donor;
+    const user = auth.currentUser;
+    if (!user) {
+      throw new ApiError('Please sign in before registering as a donor.');
     }
 
-    // Local fallback
-    const newDonor = {
-      id: `donor-${Date.now()}`,
-      ...donorData,
-      donationsTotal: 0,
-      isVerified: true
-    };
-    localDonors.unshift(newDonor);
-    return newDonor;
+    try {
+      const record = {
+        ...donorData,
+        uid: user.uid,
+        isActive: true,
+        donationsTotal: donorData.donationsTotal ?? 0,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, 'donors', user.uid), record, { merge: true });
+      return { id: user.uid, ...donorData };
+    } catch (error) {
+      throw toApiError(error, 'Could not complete registration. Please try again.');
+    }
   },
 
-  // Get urgent requests
-  async getRequests({ district, bloodGroup }) {
-    const apiRes = await fetchApi(`/requests?district=${encodeURIComponent(district || '')}&bloodGroup=${encodeURIComponent(bloodGroup || '')}`);
-    if (apiRes && apiRes.success) {
-      return apiRes.requests;
-    }
+  /** Hide the caller's own listing without deleting their account. */
+  async withdrawDonorListing() {
+    const user = auth.currentUser;
+    if (!user) throw new ApiError('Please sign in first.');
 
-    // Local fallback
-    let results = [...localRequests];
-    if (bloodGroup && bloodGroup !== 'All Blood Groups' && bloodGroup !== 'All') {
-      results = results.filter(r => r.bloodGroup.toLowerCase() === bloodGroup.toLowerCase());
-    }
-    if (district && district !== 'All Districts' && district !== 'All') {
-      results = results.filter(r => r.district.toLowerCase() === district.toLowerCase());
-    }
-    return results;
-  },
-
-  // Post urgent blood request
-  async createRequest(requestData) {
-    const apiRes = await fetchApi('/requests', {
-      method: 'POST',
-      body: JSON.stringify(requestData)
-    });
-
-    if (apiRes && apiRes.success) {
-      return apiRes.request;
-    }
-
-    // Local fallback
-    const newReq = {
-      id: `req-${Date.now()}`,
-      ...requestData,
-      isUrgent: true,
-      fulfilled: false,
-      dateNeeded: new Date().toISOString().split('T')[0]
-    };
-    localRequests.unshift(newReq);
-    return newReq;
-  },
-
-  // Mark fulfilled
-  async fulfillRequest(id) {
-    const apiRes = await fetchApi(`/requests/${id}/fulfill`, { method: 'POST' });
-    if (apiRes && apiRes.success) {
+    try {
+      await updateDoc(doc(db, 'donors', user.uid), {
+        isActive: false,
+        updatedAt: serverTimestamp(),
+      });
       return true;
+    } catch (error) {
+      throw toApiError(error, 'Could not withdraw your listing. Please try again.');
     }
-    const item = localRequests.find(r => r.id === id);
-    if (item) item.fulfilled = true;
-    return true;
-  }
+  },
+
+  async getRequests({ district, bloodGroup }) {
+    try {
+      const constraints = [where('fulfilled', '==', false)];
+
+      if (district && district !== 'All' && district !== 'All Districts') {
+        constraints.push(where('district', '==', district));
+      }
+      if (bloodGroup && bloodGroup !== 'All' && bloodGroup !== 'All Blood Groups') {
+        constraints.push(where('bloodGroup', '==', bloodGroup));
+      }
+
+      const snapshot = await getDocs(
+        query(
+          collection(db, 'requests'),
+          ...constraints,
+          orderBy('createdAt', 'desc'),
+          limit(MAX_RESULTS)
+        )
+      );
+
+      return snapshot.docs.map(serialise);
+    } catch (error) {
+      throw toApiError(error, 'Could not load emergency requests. Please try again.');
+    }
+  },
+
+  async createRequest(requestData) {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new ApiError('Please sign in before posting an emergency request.');
+    }
+
+    try {
+      const record = {
+        ...requestData,
+        uid: user.uid,
+        fulfilled: false,
+        isUrgent: requestData.isUrgent ?? true,
+        createdAt: serverTimestamp(),
+        dateNeeded: requestData.dateNeeded || new Date().toISOString().split('T')[0],
+      };
+
+      const created = await addDoc(collection(db, 'requests'), record);
+      return { id: created.id, ...requestData };
+    } catch (error) {
+      throw toApiError(error, 'Could not post your request. Please try again.');
+    }
+  },
+
+  /** Only the poster may mark their own request fulfilled (enforced in rules). */
+  async fulfillRequest(id) {
+    if (!auth.currentUser) throw new ApiError('Please sign in first.');
+
+    try {
+      await updateDoc(doc(db, 'requests', id), {
+        fulfilled: true,
+        fulfilledAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      throw toApiError(error, 'Could not update this request. Please try again.');
+    }
+  },
+
+  /**
+   * Moderation queue. Reports are write-only for ordinary users: rules allow
+   * create but not read, so nobody can enumerate who reported what.
+   */
+  async reportListing({ listingType, listingId, reason }) {
+    try {
+      await addDoc(collection(db, 'reports'), {
+        listingType,
+        listingId,
+        reason: reason || 'No reason given',
+        reportedBy: auth.currentUser?.uid || 'anonymous',
+        createdAt: serverTimestamp(),
+        status: 'open',
+      });
+      return true;
+    } catch (error) {
+      throw toApiError(error, 'Could not send your report. Please try again.');
+    }
+  },
 };
