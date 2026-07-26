@@ -2,12 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
-export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 3 }) => {
+export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) => {
   const tabs = [
     { id: 'search', label: 'SEARCH', icon: 'search' },
     { id: 'requests', label: 'REQUESTS', icon: 'bell', badge: requestsBadgeCount },
     { id: 'be_a_donor', label: 'BE A DONOR', icon: 'user-plus' },
-    { id: 'about_ap', label: 'ABOUT AP', icon: 'info' },
+    { id: 'about', label: 'ABOUT', icon: 'info' },
   ];
 
   return (

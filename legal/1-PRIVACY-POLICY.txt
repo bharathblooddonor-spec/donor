@@ -1,0 +1,129 @@
+PRIVACY POLICY
+Bharath Blood Donor
+
+Last updated: 26 July 2026
+
+
+IN SHORT
+
+We collect only what the app needs to connect blood donors with patients. We never sell your data, never show ads, and never track you. If you choose to list yourself as a donor, the details you enter become visible to other signed-in users — that is the purpose of the app, and we ask for your explicit consent first. You can hide your listing or delete your account permanently, from inside the app, at any time.
+
+
+1. WHO WE ARE
+
+Bharath Blood Donor ("the app", "we", "us") is a free, non-commercial service that helps voluntary blood donors and patients in Andhra Pradesh, India contact each other directly.
+
+Operated by: Mahesh Khaja
+Email: bharathblooddonor@gmail.com
+Address: Vijayawada, Andhra Pradesh, India
+
+We are the data fiduciary for the purposes of India's Digital Personal Data Protection Act, 2023 (DPDP Act).
+
+
+2. WHAT WE COLLECT
+
+When you create an account:
+• Email address
+• Password — stored only as a cryptographic hash by Firebase Authentication. We never see, store, or have any way to recover your actual password.
+• Display name
+• Your district and blood group, if you choose to provide them
+
+When you list yourself as a donor:
+Listing is optional and entirely separate from creating an account. If you choose to list, we collect and publish to other signed-in users:
+• Name
+• Age and gender
+• Blood group
+• District and city
+• Phone number
+• Availability status and approximate time since your last donation
+
+When you post an emergency request:
+• Patient name, blood group required, units needed
+• Hospital name and location
+• Contact name and phone number
+• Reason for the request
+
+Location:
+We request your approximate location only when you tap "Use my current location". We use it once, immediately, to work out which district and city to pre-fill, and then discard it. We never store your coordinates, never send them to our servers, and never track you in the background. You can always skip this and pick your district manually.
+
+What we do NOT collect:
+No analytics. No advertising identifiers. No cookies. No third-party trackers. No browsing history. No contacts, photos, or files. We do not sell, rent, or trade your data to anyone, for any purpose, ever.
+
+
+3. SENSITIVE PERSONAL DATA
+
+Your blood group is health data. Under the DPDP Act 2023 and Article 9 of the EU GDPR this is a special category of personal data that requires your explicit consent before it can be processed or published.
+
+We ask for that consent with a specific, unticked checkbox shown before you are listed as a donor. Creating an account alone never publishes anything about you. You can withdraw consent at any time — see section 7.
+
+
+4. WHO CAN SEE YOUR INFORMATION
+
+Your email address — only you
+Your account profile — only you
+Your donor listing — any signed-in user searching for donors
+Your emergency request — any signed-in user
+Reports you submit about bad listings — only our moderation team
+
+Donor listings and emergency requests are visible to all signed-in users — that is what the app is for. We deliberately require sign-in to read the directory so that donor phone numbers cannot be harvested anonymously in bulk.
+
+Please understand the trade-off before you list. A published phone number can be called or messaged by anyone with an account, including people acting in bad faith. Only list yourself if you accept that risk. You can hide your listing at any time.
+
+
+5. WHERE YOUR DATA IS STORED
+
+We use Google Firebase (Firebase Authentication and Cloud Firestore). Your data is stored on Google Cloud infrastructure in the asia-south1 region (Mumbai, India). Your personal data does not leave India.
+
+Google processes this data as our sub-processor under the Firebase Data Processing Terms (https://firebase.google.com/terms/data-processing-terms).
+
+
+6. HOW LONG WE KEEP IT
+
+Account data — until you delete your account.
+Donor listings — until you hide the listing or delete your account.
+Emergency requests — removed automatically 30 days after the date needed.
+Abuse reports — 30 days, so we can identify repeat offenders.
+
+When you delete your account, your profile and donor listing are removed immediately and permanently.
+
+
+7. YOUR RIGHTS
+
+At any time, from inside the app, you can:
+• See everything we hold about you — it is all shown on your own screens.
+• Correct it by editing your listing.
+• Withdraw consent and hide your donor listing — About > Your Account > Hide my donor listing. Your account stays active.
+• Delete your account and all associated data permanently — About > Your Account > Delete my account.
+
+To exercise any right we have not built into the app, or to complain, email bharathblooddonor@gmail.com. We acknowledge your request within 48 hours and complete it within 30 days.
+
+Under the DPDP Act you may also nominate another person to exercise these rights on your behalf in the event of your death or incapacity, and you have the right to complain to the Data Protection Board of India.
+
+
+8. CHILDREN
+
+This app is not intended for anyone under 18. Blood donation in India is restricted to people aged 18 to 65, and the app enforces this. We do not knowingly collect data from children. If you believe a child has registered, email us and we will delete the account.
+
+
+9. SECURITY
+
+• Passwords are hashed by Firebase Authentication — we never store plaintext.
+• All network traffic uses HTTPS/TLS.
+• Access is enforced server-side by Firestore Security Rules, not merely by the app.
+• Reading the donor directory requires a signed-in account.
+
+No system is perfectly secure. Treat anything published in a donor listing as public information.
+
+
+10. THIS APP IS NOT MEDICAL CARE
+
+Bharath Blood Donor does not provide medical advice and is not a blood bank. We do not verify or medically screen donors — all listing details are self-reported by users. All blood must be collected and tested at a licensed blood bank. In a medical emergency, call 108.
+
+
+11. CHANGES TO THIS POLICY
+
+If we make a material change we will notify you in the app before it takes effect. The "last updated" date at the top always reflects the current version.
+
+
+Bharath Blood Donor is a free, non-commercial community service.
+Questions about this policy: bharathblooddonor@gmail.com

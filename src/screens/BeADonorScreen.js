@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { apiService } from '../api/apiService';
+import { detectDistrictAndCity } from '../utils/location';
 import { NativePicker } from '../components/NativePicker';
+
+/** Indian mobile numbers are 10 digits starting 6-9, optionally +91 prefixed. */
+const INDIAN_MOBILE_RE = /^(?:\+?91)?[6-9]\d{9}$/;
 
 export const BeADonorScreen = ({ onRegistered }) => {
   const [name, setName] = useState('');
@@ -17,14 +21,28 @@ export const BeADonorScreen = ({ onRegistered }) => {
   const [lastDonated, setLastDonated] = useState('First Time Donor (Never)');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gpsText, setGpsText] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
 
-  const handleDetectGps = () => {
-    setGpsText('GPS Detected: 16.5062° N, 80.6480° E (Vijayawada, NTR)');
-    setDistrict('NTR');
-    setCity('Vijayawada');
+  const handleDetectGps = async () => {
+    setGpsLoading(true);
+    setGpsText('');
+    try {
+      const detected = await detectDistrictAndCity();
+      setDistrict(detected.district);
+      if (detected.city) setCity(detected.city);
+      setGpsText(detected.label);
+    } catch (e) {
+      setGpsText('');
+      Alert.alert('Location unavailable', e.message);
+    } finally {
+      setGpsLoading(false);
+    }
   };
 
   const handleRegister = async () => {
+    const parsedAge = Number.parseInt(age, 10);
+
     if (!name.trim()) {
       Alert.alert('Form Error', 'Please enter your full name.');
       return;
@@ -33,33 +51,52 @@ export const BeADonorScreen = ({ onRegistered }) => {
       Alert.alert('Form Error', 'Please select your gender.');
       return;
     }
-    if (!phone || phone.trim().length < 10) {
-      Alert.alert('Form Error', 'Please enter a valid mobile number.');
+    // Blood donation in India is restricted to donors aged 18-65.
+    if (!Number.isFinite(parsedAge) || parsedAge < 18 || parsedAge > 65) {
+      Alert.alert(
+        'Age Not Eligible',
+        'Blood donors in India must be between 18 and 65 years old. Please enter your correct age.'
+      );
+      return;
+    }
+    if (!INDIAN_MOBILE_RE.test(phone.replace(/[\s-]/g, ''))) {
+      Alert.alert('Form Error', 'Please enter a valid 10-digit Indian mobile number.');
       return;
     }
     if (district === 'Select District') {
       Alert.alert('Form Error', 'Please select your district in Andhra Pradesh.');
       return;
     }
+    if (!consentGiven) {
+      Alert.alert(
+        'Consent Required',
+        'Please confirm you agree to your name, blood group, district and phone number being shown to people searching for donors.'
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const newDonor = await apiService.registerDonor({
-        name,
-        age: parseInt(age) || 25,
+        name: name.trim(),
+        age: parsedAge,
         gender,
         bloodGroup,
         status: currentStatus,
-        phone,
+        phone: phone.replace(/[\s-]/g, ''),
         district,
         city: city || district,
-        lastDonated
+        lastDonated,
+        consentedAt: new Date().toISOString(),
       });
 
-      Alert.alert('Registered Successfully', `${newDonor.name}, you are now a registered blood donor in ${newDonor.district}, AP.`);
+      Alert.alert(
+        'Registered Successfully',
+        `${newDonor?.name || name}, you are now a registered blood donor in ${newDonor?.district || district}, AP.`
+      );
       if (onRegistered) onRegistered();
     } catch (e) {
-      Alert.alert('Error', 'Failed to register. Please try again.');
+      Alert.alert('Registration failed', e.message || 'Failed to register. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -167,9 +204,22 @@ export const BeADonorScreen = ({ onRegistered }) => {
           </View>
         )}
 
-        <TouchableOpacity style={styles.gpsButton} onPress={handleDetectGps} activeOpacity={0.8}>
-          <Feather name="target" size={15} color="#D32F2F" style={{ marginRight: 6 }} />
-          <Text style={styles.gpsButtonText}>Detect My Coordinates (GPS)</Text>
+        <TouchableOpacity
+          style={[styles.gpsButton, gpsLoading && styles.gpsButtonDisabled]}
+          onPress={handleDetectGps}
+          disabled={gpsLoading}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Detect my district and city using GPS"
+        >
+          {gpsLoading ? (
+            <ActivityIndicator size="small" color="#D32F2F" style={{ marginRight: 6 }} />
+          ) : (
+            <Feather name="target" size={15} color="#D32F2F" style={{ marginRight: 6 }} />
+          )}
+          <Text style={styles.gpsButtonText}>
+            {gpsLoading ? 'Detecting location…' : 'Detect My District (GPS)'}
+          </Text>
         </TouchableOpacity>
         {gpsText ? <Text style={styles.gpsText}>{gpsText}</Text> : null}
 
@@ -180,15 +230,41 @@ export const BeADonorScreen = ({ onRegistered }) => {
           items={['First Time Donor (Never)', 'Within 3 Months', 'More than 3 Months Ago', 'More than 6 Months Ago']}
         />
 
+        {/* Explicit consent — blood group is health data, so publishing it
+            alongside a phone number needs an affirmative opt-in, not a notice. */}
+        <TouchableOpacity
+          style={styles.consentRow}
+          onPress={() => setConsentGiven((prev) => !prev)}
+          activeOpacity={0.7}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: consentGiven }}
+          accessibilityLabel="I consent to my details being shown to people searching for donors"
+        >
+          <View style={[styles.checkbox, consentGiven && styles.checkboxChecked]}>
+            {consentGiven && <Feather name="check" size={13} color="#ffffff" />}
+          </View>
+          <Text style={styles.consentText}>
+            I agree that my <Text style={styles.consentBold}>name, age, gender, blood group,
+            district and phone number</Text> will be publicly visible to anyone searching for
+            donors. I can request removal at any time from the About screen.
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.registerSubmitBtn, isSubmitting && { opacity: 0.6 }]}
           onPress={handleRegister}
           disabled={isSubmitting}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Register as a blood donor"
         >
-          <Feather name="check-circle" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+          ) : (
+            <Feather name="check-circle" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+          )}
           <Text style={styles.registerSubmitText}>
-            {isSubmitting ? 'Registering...' : 'Register Now'}
+            {isSubmitting ? 'Registering…' : 'Register Now'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -304,12 +380,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  gpsButtonDisabled: {
+    opacity: 0.6,
+  },
   gpsText: {
     fontSize: 11,
     color: '#16a34a',
     textAlign: 'center',
     marginBottom: 10,
     fontWeight: '600',
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#D32F2F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 1,
+    backgroundColor: '#ffffff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#D32F2F',
+  },
+  consentText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  consentBold: {
+    fontWeight: '700',
+    color: '#334155',
   },
   registerSubmitBtn: {
     backgroundColor: '#D32F2F',

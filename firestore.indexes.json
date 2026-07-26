@@ -1,0 +1,82 @@
+{
+  "_comment": [
+    "Composite indexes for the filter combinations the app actually issues.",
+    "Firestore creates single-field indexes automatically, but any query that",
+    "mixes several equality filters with an orderBy needs an explicit composite",
+    "index or it fails at runtime with FAILED_PRECONDITION.",
+    "",
+    "Deploy with: firebase deploy --only firestore:indexes",
+    "Index builds are asynchronous - check the Firebase console before testing."
+  ],
+  "indexes": [
+    {
+      "_comment": "Donor search: district only",
+      "collectionGroup": "donors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "district", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "Donor search: blood group only",
+      "collectionGroup": "donors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "bloodGroup", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "Donor search: district + blood group (the common case)",
+      "collectionGroup": "donors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "district", "order": "ASCENDING" },
+        { "fieldPath": "bloodGroup", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "Emergency board: unfiltered, newest first",
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fulfilled", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Emergency board: filtered by district",
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fulfilled", "order": "ASCENDING" },
+        { "fieldPath": "district", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Emergency board: filtered by blood group",
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fulfilled", "order": "ASCENDING" },
+        { "fieldPath": "bloodGroup", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Emergency board: filtered by district + blood group",
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fulfilled", "order": "ASCENDING" },
+        { "fieldPath": "district", "order": "ASCENDING" },
+        { "fieldPath": "bloodGroup", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

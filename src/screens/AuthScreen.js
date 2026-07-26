@@ -1,32 +1,123 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apBloodGroups } from '../data/apData';
 import { NativePicker } from '../components/NativePicker';
+import { authService } from '../api/authService';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '../constants/legal';
 
-export const AuthScreen = ({ onLoginSuccess }) => {
+/** Split into two linear checks — a single combined pattern backtracks badly. */
+function isValidEmail(value) {
+  if (!/^[^\s@]+@[^\s@]+$/.test(value)) return false;
+  const domain = value.slice(value.indexOf('@') + 1);
+  return domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
+}
+
+/**
+ * On success we do nothing here — App.js subscribes to Firebase auth state and
+ * swaps this screen out automatically once the session exists.
+ */
+export const AuthScreen = () => {
   const [activeTab, setActiveTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [district, setDistrict] = useState('NTR');
   const [bloodGroup, setBloodGroup] = useState('O+');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!email || !password) {
-      Alert.alert('Required Fields', 'Please enter your email and password.');
+  const isRegister = activeTab === 'register';
+
+  let submitLabel;
+  if (submitting) {
+    submitLabel = isRegister ? 'Creating account…' : 'Signing in…';
+  } else {
+    submitLabel = isRegister ? 'Register Account' : 'Sign In';
+  }
+
+  const switchTab = (tab) => {
+    if (submitting) return;
+    setActiveTab(tab);
+  };
+
+  const handleSubmit = async () => {
+    const trimmedEmail = email.trim();
+
+    if (!isValidEmail(trimmedEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
-    onLoginSuccess({
-      email,
-      name: name || (email.split('@')[0]),
-      district,
-      bloodGroup
-    });
+    if (!password) {
+      Alert.alert('Required Fields', 'Please enter your password.');
+      return;
+    }
+    if (isRegister && password.length < 8) {
+      Alert.alert('Weak Password', 'Please choose a password of at least 8 characters.');
+      return;
+    }
+    if (isRegister && !name.trim()) {
+      Alert.alert('Required Fields', 'Please enter your full name.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (isRegister) {
+        await authService.register({
+          email: trimmedEmail,
+          password,
+          name,
+          district,
+          bloodGroup,
+        });
+      } else {
+        await authService.signIn({ email: trimmedEmail, password });
+      }
+      // App.js reacts to the auth state change and renders the main app.
+    } catch (e) {
+      Alert.alert(isRegister ? 'Could not create account' : 'Could not sign in', e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = () => {
+    const trimmedEmail = email.trim();
+    if (!isValidEmail(trimmedEmail)) {
+      Alert.alert('Enter your email', 'Type your email address above, then tap "Forgot password" again.');
+      return;
+    }
+
+    Alert.alert(
+      'Reset password',
+      `Send a password reset link to ${trimmedEmail}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async () => {
+            try {
+              await authService.sendPasswordReset(trimmedEmail);
+              Alert.alert('Check your email', 'If an account exists for that address, a reset link is on its way.');
+            } catch (e) {
+              Alert.alert('Could not send reset email', e.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView
+      style={styles.flex1}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.brandingHeader}>
         <View style={styles.logoWrapper}>
           <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
@@ -39,8 +130,10 @@ export const AuthScreen = ({ onLoginSuccess }) => {
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'signin' && styles.activeTabButton]}
-            onPress={() => setActiveTab('signin')}
+            onPress={() => switchTab('signin')}
             activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'signin' }}
           >
             <Text style={[styles.tabText, activeTab === 'signin' && styles.activeTabText]}>
               Sign In
@@ -50,8 +143,10 @@ export const AuthScreen = ({ onLoginSuccess }) => {
 
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'register' && styles.activeTabButton]}
-            onPress={() => setActiveTab('register')}
+            onPress={() => switchTab('register')}
             activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'register' }}
           >
             <Text style={[styles.tabText, activeTab === 'register' && styles.activeTabText]}>
               Create Account
@@ -114,24 +209,72 @@ export const AuthScreen = ({ onLoginSuccess }) => {
             <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
             <TextInput
               style={styles.textInput}
-              placeholder="••••••••"
+              placeholder={isRegister ? 'At least 8 characters' : '••••••••'}
               secureTextEntry={true}
+              autoCapitalize="none"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              textContentType={isRegister ? 'newPassword' : 'password'}
               value={password}
               onChangeText={setPassword}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="go"
             />
           </View>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleSubmit} activeOpacity={0.85}>
+          {!isRegister && (
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={styles.forgotBtn}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={submitting}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={isRegister ? 'Create your account' : 'Sign in to your account'}
+          >
             <View style={styles.btnContent}>
-              <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginRight: 6 }} />
-              <Text style={styles.primaryButtonText}>
-                {activeTab === 'signin' ? 'Sign In' : 'Register Account'}
-              </Text>
+              {submitting ? (
+                <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+              ) : (
+                <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+              )}
+              <Text style={styles.primaryButtonText}>{submitLabel}</Text>
             </View>
           </TouchableOpacity>
+
+          {isRegister && (
+            <Text style={styles.legalText}>
+              By creating an account you agree to our{' '}
+              <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                Terms of Use
+              </Text>{' '}
+              and{' '}
+              <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                Privacy Policy
+              </Text>
+              . Creating an account does not publish your details — you choose separately
+              whether to list yourself as a donor.
+            </Text>
+          )}
         </View>
       </View>
+
+      <View style={styles.emergencyNotice}>
+        <Feather name="alert-circle" size={14} color="#991b1b" style={{ marginRight: 6 }} />
+        <Text style={styles.emergencyNoticeText}>
+          This app is not a substitute for emergency medical care. In an emergency, call 108.
+        </Text>
+      </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -278,5 +421,46 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    marginBottom: 6,
+  },
+  forgotText: {
+    fontSize: 12,
+    color: '#D32F2F',
+    fontWeight: '600',
+  },
+  legalText: {
+    fontSize: 10,
+    color: '#64748B',
+    lineHeight: 15,
+    marginTop: 12,
+  },
+  legalLink: {
+    color: '#D32F2F',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  emergencyNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 16,
+    maxWidth: 420,
+  },
+  emergencyNoticeText: {
+    flex: 1,
+    fontSize: 10,
+    color: '#991b1b',
+    lineHeight: 14,
   },
 });
