@@ -1,4 +1,5 @@
 @echo off
+set PATH=C:\Program Files\nodejs;C:\Program Files\Git\cmd;%PATH%
 title Bharath Blood Donor - Native App Build Script
 echo ========================================================
 echo   BHARATH BLOOD DONOR (AP) - NATIVE BUILD GENERATOR
