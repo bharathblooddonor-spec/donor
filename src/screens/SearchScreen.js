@@ -546,21 +546,24 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   bgChip: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
-    minWidth: '22%',
+    flexBasis: '22%',
+    flexGrow: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   bgChipSelected: {
     backgroundColor: '#D32F2F',
     borderColor: '#D32F2F',
   },
   bgChipRare: {
-    minWidth: '47%',
+    flexBasis: '47%',
+    flexGrow: 1,
   },
   bgChipText: {
     fontSize: 11,
