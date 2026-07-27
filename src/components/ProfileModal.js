@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Image,
   ActivityIndicator,
   Alert,
   Switch,
@@ -17,14 +16,13 @@ import { authService } from '../api/authService';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { NativePicker } from './NativePicker';
 
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-];
+/**
+ * Apply a stored value to form state, leaving the existing default in place
+ * when the field was never saved. `false` is a real value and must survive.
+ */
+function applyIfSet(value, setter) {
+  if (value !== undefined && value !== null && value !== '') setter(value);
+}
 
 export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }) => {
   const [name, setName] = useState('');
@@ -33,8 +31,8 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
   const [city, setCity] = useState('Vijayawada');
   const [bloodGroup, setBloodGroup] = useState('O+');
   const [age, setAge] = useState('25');
-  const [photoURL, setPhotoURL] = useState('');
   const [availableToDonate, setAvailableToDonate] = useState(true);
+  const [hasDonorListing, setHasDonorListing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
 
@@ -48,19 +46,22 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
     setFetching(true);
     try {
       setName(currentUser.displayName || '');
-      setPhotoURL(currentUser.photoURL || AVATAR_PRESETS[0]);
 
-      const profile = await authService.getProfile(currentUser.uid);
-      if (profile) {
-        if (profile.name) setName(profile.name);
-        if (profile.phone) setPhone(profile.phone);
-        if (profile.district) setDistrict(profile.district);
-        if (profile.city) setCity(profile.city);
-        if (profile.bloodGroup) setBloodGroup(profile.bloodGroup);
-        if (profile.age) setAge(String(profile.age));
-        if (profile.photoURL) setPhotoURL(profile.photoURL);
-        if (profile.isActive !== undefined) setAvailableToDonate(profile.isActive);
-      }
+      const [profile, donor] = await Promise.all([
+        authService.getProfile(currentUser.uid),
+        authService.getDonorProfile(currentUser.uid),
+      ]);
+
+      applyIfSet(profile?.name, setName);
+      applyIfSet(profile?.phone, setPhone);
+      applyIfSet(profile?.district, setDistrict);
+      applyIfSet(profile?.city, setCity);
+      applyIfSet(profile?.bloodGroup, setBloodGroup);
+
+      // age and isActive are stored on the listing, not the private profile.
+      setHasDonorListing(Boolean(donor));
+      applyIfSet(donor?.age && String(donor.age), setAge);
+      applyIfSet(donor?.isActive, setAvailableToDonate);
     } catch (e) {
       console.warn('Could not fetch existing profile data', e);
     } finally {
@@ -76,9 +77,8 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
 
     setLoading(true);
     try {
-      await authService.updateUserProfile({
+      const { donorListingUpdated } = await authService.updateUserProfile({
         name: name.trim(),
-        photoURL,
         phone: phone.trim(),
         district,
         city,
@@ -87,7 +87,13 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
         availableToDonate,
       });
 
-      Alert.alert('Profile Updated', 'Your profile details have been saved successfully!');
+      Alert.alert(
+        'Profile Updated',
+        donorListingUpdated
+          ? 'Your profile and donor listing have been saved.'
+          : 'Your profile has been saved. You are not listed as a donor yet, so your ' +
+            'availability and age were not published — register on the Be a Donor tab first.',
+      );
       if (onProfileUpdated) onProfileUpdated();
       onClose();
     } catch (e) {
@@ -121,37 +127,16 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
             </View>
           ) : (
             <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-              {/* DP / Profile Picture Section */}
+              {/* Initials stand in for a photo: there is no upload, and stock
+                  portraits of strangers would misrepresent who a donor is. */}
               <View style={styles.dpSection}>
                 <View style={styles.dpContainer}>
-                  {photoURL ? (
-                    <Image source={{ uri: photoURL }} style={styles.dpImage} />
-                  ) : (
-                    <View style={styles.dpFallback}>
-                      <Text style={styles.dpInitial}>
-                        {(name || currentUser?.email || 'U').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.dpBadge}>
-                    <Feather name="camera" size={12} color="#ffffff" />
+                  <View style={styles.dpFallback}>
+                    <Text style={styles.dpInitial}>
+                      {(name || currentUser?.email || 'U').charAt(0).toUpperCase()}
+                    </Text>
                   </View>
                 </View>
-
-                <Text style={styles.dpLabel}>Choose Avatar / Profile Picture</Text>
-
-                {/* Avatar Presets */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.avatarList}>
-                  {AVATAR_PRESETS.map((url, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      onPress={() => setPhotoURL(url)}
-                      style={[styles.avatarOption, photoURL === url && styles.avatarOptionSelected]}
-                    >
-                      <Image source={{ uri: url }} style={styles.avatarPresetImg} />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
               </View>
 
               {/* Account Email Display */}
@@ -234,12 +219,16 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text style={styles.switchTitle}>Available for Emergency Donation</Text>
                   <Text style={styles.switchSubtitle}>
-                    Show your contact in blood search results for recipients in need.
+                    {hasDonorListing
+                      ? 'Show your contact in blood search results for recipients in need.'
+                      : 'You are not listed as a donor yet. Register on the Be a Donor tab to ' +
+                        'publish your listing — this switch has no effect until then.'}
                   </Text>
                 </View>
                 <Switch
-                  value={availableToDonate}
+                  value={hasDonorListing && availableToDonate}
                   onValueChange={setAvailableToDonate}
+                  disabled={!hasDonorListing}
                   trackColor={{ false: '#d1d5db', true: '#ef4444' }}
                   thumbColor={availableToDonate ? '#ffffff' : '#f4f4f5'}
                 />
@@ -328,13 +317,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 8,
   },
-  dpImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#D32F2F',
-  },
   dpFallback: {
     width: 80,
     height: 80,
@@ -347,46 +329,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 32,
     fontWeight: '800',
-  },
-  dpBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#D32F2F',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  dpLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  avatarList: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-  },
-  avatarOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-  },
-  avatarOptionSelected: {
-    borderColor: '#D32F2F',
-    transform: [{ scale: 1.08 }],
-  },
-  avatarPresetImg: {
-    width: '100%',
-    height: '100%',
   },
   infoBadgeContainer: {
     flexDirection: 'row',

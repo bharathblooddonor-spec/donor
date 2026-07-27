@@ -108,17 +108,6 @@ export const AuthScreen = () => {
     );
   };
 
-  const handleGoogleSignIn = async () => {
-    setSubmitting(true);
-    try {
-      await authService.signInWithGoogle();
-    } catch (e) {
-      Alert.alert('Google Sign-In', e.message || 'Could not sign in with Google.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.flex1}
@@ -259,26 +248,6 @@ export const AuthScreen = () => {
               )}
               <Text style={styles.primaryButtonText}>{submitLabel}</Text>
             </View>
-          </TouchableOpacity>
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Google / Gmail Sign In Button */}
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={handleGoogleSignIn}
-            disabled={submitting}
-            activeOpacity={0.85}
-          >
-            <Feather name="chrome" size={18} color="#ea4335" style={{ marginRight: 8 }} />
-            <Text style={styles.googleButtonText}>
-              {isRegister ? 'Sign up with Gmail / Google' : 'Sign in with Gmail / Google'}
-            </Text>
           </TouchableOpacity>
 
           {isRegister && (
@@ -455,38 +424,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonDisabled: {
     opacity: 0.7,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e2e8f0',
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    height: 46,
-    borderRadius: 8,
-    elevation: 1,
-  },
-  googleButtonText: {
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: '600',
   },
   forgotBtn: {
     alignSelf: 'flex-end',

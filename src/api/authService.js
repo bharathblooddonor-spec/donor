@@ -8,8 +8,6 @@ import {
   deleteUser,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  GoogleAuthProvider,
-  signInWithPopup,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -28,7 +26,6 @@ const AUTH_ERROR_MESSAGES = {
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
   'auth/network-request-failed': 'Could not reach the server. Check your internet connection.',
   'auth/requires-recent-login': 'For security, please sign in again before deleting your account.',
-  'auth/popup-closed-by-user': 'Google sign in popup was closed before completing.',
 };
 
 export class AuthError extends Error {
@@ -41,6 +38,17 @@ export class AuthError extends Error {
 
 function toAuthError(error) {
   return error instanceof AuthError ? error : new AuthError(error?.code, error?.message);
+}
+
+/**
+ * Keep only the fields the user actually filled in. A blank input must leave
+ * the stored value alone rather than overwrite it with an empty string, which
+ * would fail the donor validation rules on the next write.
+ */
+function pickProvided(fields) {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  );
 }
 
 export const authService = {
@@ -89,34 +97,6 @@ export const authService = {
     }
   },
 
-  async signInWithGoogle() {
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Sync or create profile document in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email ? user.email.toLowerCase() : '',
-          name: user.displayName || 'Google User',
-          photoURL: user.photoURL || null,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      return user;
-    } catch (error) {
-      throw toAuthError(error);
-    }
-  },
-
   async signOut() {
     try {
       await signOut(auth);
@@ -138,55 +118,64 @@ export const authService = {
     return snapshot.exists() ? snapshot.data() : null;
   },
 
+  /**
+   * The public donor listing, or null if the user has never registered as one.
+   *
+   * `age` and `isActive` live here rather than on the private profile, so any
+   * screen that edits them has to read them from here too — reading them off
+   * `users` silently yields undefined and the field resets to its default.
+   */
+  async getDonorProfile(uid) {
+    const snapshot = await getDoc(doc(db, 'donors', uid));
+    return snapshot.exists() ? snapshot.data() : null;
+  },
+
+  /**
+   * Save the profile sheet. Returns `{ user, donorListingUpdated }` — callers
+   * must not report the donor-only fields as saved when there is no listing to
+   * save them to.
+   */
   async updateUserProfile(profileData) {
     const user = auth.currentUser;
     if (!user) throw new AuthError('auth/user-not-found');
 
+    const { name, photoURL, phone, district, city, bloodGroup, age, availableToDonate } = profileData;
+    const displayName = name || user.displayName;
+
     try {
-      const { name, photoURL, phone, district, city, bloodGroup, age, availableToDonate } = profileData;
+      await updateProfile(user, {
+        displayName,
+        photoURL: photoURL !== undefined ? photoURL : user.photoURL,
+      });
 
-      // 1. Update Auth profile
-      if (name || photoURL) {
-        await updateProfile(user, {
-          displayName: name || user.displayName,
-          photoURL: photoURL !== undefined ? photoURL : user.photoURL,
-        });
-      }
+      // Fields common to the private profile and the public listing.
+      const shared = pickProvided({ phone, district, city, bloodGroup });
+      if (photoURL !== undefined) shared.photoURL = photoURL;
 
-      // 2. Update Firestore users doc
-      const userDocData = {
-        name: name || user.displayName,
-        updatedAt: serverTimestamp(),
-      };
-      if (photoURL !== undefined) userDocData.photoURL = photoURL;
-      if (phone) userDocData.phone = phone;
-      if (district) userDocData.district = district;
-      if (city) userDocData.city = city;
-      if (bloodGroup) userDocData.bloodGroup = bloodGroup;
+      // uid and email are required by the users/ create rule. They are
+      // unchanged on every normal save, but including them means a merge onto
+      // a missing document still passes validation instead of being denied.
+      await setDoc(
+        doc(db, 'users', user.uid),
+        { ...shared, uid: user.uid, email: user.email, name: displayName, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
 
-      await setDoc(doc(db, 'users', user.uid), userDocData, { merge: true });
-
-      // 3. Update Firestore donors doc if exists or created
+      // The listing is deliberately never created here. Publishing a blood
+      // group is health data and needs the explicit consent collected on the
+      // Be a Donor screen — not a toggle inside a profile sheet.
       const donorRef = doc(db, 'donors', user.uid);
-      const donorSnap = await getDoc(donorRef);
+      const donorListingUpdated = (await getDoc(donorRef)).exists();
 
-      if (donorSnap.exists()) {
-        const donorUpdate = {
-          name: name || user.displayName,
-          updatedAt: serverTimestamp(),
-        };
-        if (photoURL !== undefined) donorUpdate.photoURL = photoURL;
-        if (phone) donorUpdate.phone = phone;
-        if (district) donorUpdate.district = district;
-        if (city) donorUpdate.city = city;
-        if (bloodGroup) donorUpdate.bloodGroup = bloodGroup;
+      if (donorListingUpdated) {
+        const donorUpdate = { ...shared, name: displayName, updatedAt: serverTimestamp() };
         if (age) donorUpdate.age = Number(age);
         if (availableToDonate !== undefined) donorUpdate.isActive = Boolean(availableToDonate);
 
         await setDoc(donorRef, donorUpdate, { merge: true });
       }
 
-      return user;
+      return { user, donorListingUpdated };
     } catch (error) {
       throw toAuthError(error);
     }
