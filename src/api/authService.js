@@ -8,6 +8,8 @@ import {
   deleteUser,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -26,6 +28,7 @@ const AUTH_ERROR_MESSAGES = {
   'auth/too-many-requests': 'Too many attempts. Please wait a few minutes and try again.',
   'auth/network-request-failed': 'Could not reach the server. Check your internet connection.',
   'auth/requires-recent-login': 'For security, please sign in again before deleting your account.',
+  'auth/popup-closed-by-user': 'Google sign in popup was closed before completing.',
 };
 
 export class AuthError extends Error {
@@ -86,6 +89,34 @@ export const authService = {
     }
   },
 
+  async signInWithGoogle() {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Sync or create profile document in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email ? user.email.toLowerCase() : '',
+          name: user.displayName || 'Google User',
+          photoURL: user.photoURL || null,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      return user;
+    } catch (error) {
+      throw toAuthError(error);
+    }
+  },
+
   async signOut() {
     try {
       await signOut(auth);
@@ -107,21 +138,79 @@ export const authService = {
     return snapshot.exists() ? snapshot.data() : null;
   },
 
+  async updateUserProfile(profileData) {
+    const user = auth.currentUser;
+    if (!user) throw new AuthError('auth/user-not-found');
+
+    try {
+      const { name, photoURL, phone, district, city, bloodGroup, age, availableToDonate } = profileData;
+
+      // 1. Update Auth profile
+      if (name || photoURL) {
+        await updateProfile(user, {
+          displayName: name || user.displayName,
+          photoURL: photoURL !== undefined ? photoURL : user.photoURL,
+        });
+      }
+
+      // 2. Update Firestore users doc
+      const userDocData = {
+        name: name || user.displayName,
+        updatedAt: serverTimestamp(),
+      };
+      if (photoURL !== undefined) userDocData.photoURL = photoURL;
+      if (phone) userDocData.phone = phone;
+      if (district) userDocData.district = district;
+      if (city) userDocData.city = city;
+      if (bloodGroup) userDocData.bloodGroup = bloodGroup;
+
+      await setDoc(doc(db, 'users', user.uid), userDocData, { merge: true });
+
+      // 3. Update Firestore donors doc if exists or created
+      const donorRef = doc(db, 'donors', user.uid);
+      const donorSnap = await getDoc(donorRef);
+
+      if (donorSnap.exists()) {
+        const donorUpdate = {
+          name: name || user.displayName,
+          updatedAt: serverTimestamp(),
+        };
+        if (photoURL !== undefined) donorUpdate.photoURL = photoURL;
+        if (phone) donorUpdate.phone = phone;
+        if (district) donorUpdate.district = district;
+        if (city) donorUpdate.city = city;
+        if (bloodGroup) donorUpdate.bloodGroup = bloodGroup;
+        if (age) donorUpdate.age = Number(age);
+        if (availableToDonate !== undefined) donorUpdate.isActive = Boolean(availableToDonate);
+
+        await setDoc(donorRef, donorUpdate, { merge: true });
+      }
+
+      return user;
+    } catch (error) {
+      throw toAuthError(error);
+    }
+  },
+
   /**
    * Permanently delete the account and all associated personal data.
    *
    * Required by App Store Review Guideline 5.1.1(v) and Google Play's account
    * deletion policy: any app offering account creation must offer in-app
-   * deletion. Firebase requires a recent login before deleting, so the caller
-   * supplies the current password to re-authenticate.
+   * deletion. Firebase requires a recent login before deleting, so password
+   * users re-authenticate here. Google-provider users have no password to
+   * supply — they fall through and rely on the session still being recent,
+   * surfacing 'auth/requires-recent-login' if it is not.
    */
   async deleteAccount(currentPassword) {
     const user = auth.currentUser;
     if (!user) throw new AuthError('auth/user-not-found');
 
     try {
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, credential);
+      if (user.email && currentPassword) {
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+      }
 
       // Remove the donor listing first — once the auth user is gone, the
       // security rules no longer permit writes against their uid.
@@ -134,3 +223,4 @@ export const authService = {
     }
   },
 };
+

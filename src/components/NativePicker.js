@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
 export const NativePicker = ({ label, selectedValue, onValueChange, items, placeholder = 'Select...' }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  // This sheet sits flush against the bottom of the window, directly over the
+  // Android navigation bar / iOS home indicator.
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
@@ -30,7 +34,7 @@ export const NativePicker = ({ label, selectedValue, onValueChange, items, place
           activeOpacity={1}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{label || 'Select Option'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -107,8 +111,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '60%',
-    paddingBottom: 30,
+    maxHeight: '70%',
   },
   modalHeader: {
     flexDirection: 'row',

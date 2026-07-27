@@ -1,8 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 
 export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) => {
+  // Android gesture/3-button navigation and the iPhone home indicator both sit
+  // over the bottom of the window. Without this padding the tab labels are
+  // physically covered by the system bar on most real devices.
+  const insets = useSafeAreaInsets();
+
   const tabs = [
     { id: 'search', label: 'SEARCH', icon: 'search' },
     { id: 'requests', label: 'REQUESTS', icon: 'bell', badge: requestsBadgeCount },
@@ -11,7 +17,7 @@ export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) =
   ];
 
   return (
-    <View style={styles.navBar}>
+    <View style={[styles.navBar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
 
@@ -21,23 +27,36 @@ export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) =
             style={styles.tabItem}
             onPress={() => setActiveTab(tab.id)}
             activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={tab.label}
           >
             {isActive && <View style={styles.topActiveLine} />}
 
             <View style={styles.iconWrapper}>
               <Feather
                 name={tab.icon}
-                size={21}
+                size={20}
                 color={isActive ? '#D32F2F' : '#64748B'}
               />
               {tab.badge ? (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{tab.badge}</Text>
+                  <Text style={styles.badgeText} maxFontSizeMultiplier={1.2}>
+                    {tab.badge}
+                  </Text>
                 </View>
               ) : null}
             </View>
 
-            <Text style={[styles.tabLabel, isActive ? styles.activeLabel : styles.inactiveLabel]}>
+            {/* "BE A DONOR" is the longest label and overflows on narrow screens
+                at large system font sizes, so cap the scale and allow shrink. */}
+            <Text
+              style={[styles.tabLabel, isActive ? styles.activeLabel : styles.inactiveLabel]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              maxFontSizeMultiplier={1.2}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -50,12 +69,14 @@ export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) =
 const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row',
-    height: 60,
+    // minHeight rather than a fixed height: the bar has to grow to fit the
+    // safe-area inset and any font scaling, not clip its own labels.
+    minHeight: 58,
+    paddingTop: 6,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    alignItems: 'stretch',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -64,15 +85,17 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
+    // minWidth:0 lets a flex child shrink below its content width — without it
+    // the longest label forces the row wider than the screen.
+    minWidth: 0,
     alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+    justifyContent: 'flex-start',
     position: 'relative',
-    paddingTop: 2,
+    paddingHorizontal: 2,
   },
   topActiveLine: {
     position: 'absolute',
-    bottom: 0,
+    top: -6,
     width: 30,
     height: 3,
     backgroundColor: '#D32F2F',

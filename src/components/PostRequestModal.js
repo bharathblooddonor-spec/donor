@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apBloodGroups } from '../data/apData';
 import { NativePicker } from './NativePicker';
@@ -27,7 +27,7 @@ export const PostRequestModal = ({ visible, onClose, onSubmit }) => {
       hospitalName,
       district,
       city,
-      units: parseInt(units) || 1,
+      units: Number.parseInt(units, 10) || 1,
       reason: reason || 'Medical Emergency',
       contactName: contactName || patientName,
       phone,
@@ -43,12 +43,17 @@ export const PostRequestModal = ({ visible, onClose, onSubmit }) => {
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      {/* Without this the keyboard covers the lower half of the form and the
+          submit button becomes unreachable on shorter phones. */}
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <View style={styles.headerTitleRow}>
               <Feather name="plus-circle" size={18} color="#D32F2F" />
-              <Text style={styles.modalTitle}>Post Urgent Blood Request</Text>
+              <Text style={styles.modalTitle} numberOfLines={1}>Post Urgent Blood Request</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={20} color="#64748B" />
@@ -74,8 +79,8 @@ export const PostRequestModal = ({ visible, onClose, onSubmit }) => {
                 />
               </View>
 
-              <View style={{ width: 120 }}>
-                <Text style={styles.label}>Units Required *</Text>
+              <View style={styles.unitsField}>
+                <Text style={styles.label} numberOfLines={1}>Units Required *</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="2"
@@ -145,7 +150,7 @@ export const PostRequestModal = ({ visible, onClose, onSubmit }) => {
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -194,7 +199,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   formScroll: {
-    maxHeight: 500,
+    // The card is already capped at 90% of screen height; let the scroll view
+    // shrink to fit inside it rather than pinning an absolute pixel height that
+    // overflows short phones and wastes space on tall ones.
+    flexShrink: 1,
   },
   label: {
     fontSize: 12,
@@ -217,8 +225,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  flex1: {
+  unitsField: {
     flex: 1,
+    minWidth: 0,
+    maxWidth: 130,
+  },
+  flex1: {
+    flex: 2,
+    minWidth: 0,
   },
   submitBtn: {
     backgroundColor: '#D32F2F',

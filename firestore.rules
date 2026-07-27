@@ -77,9 +77,14 @@ service cloud.firestore {
                             && incoming().district is string
                             && incoming().district.size() > 0
                             && incoming().isActive is bool
-                            // Donation counts are not self-certifiable; keep the
-                            // field present but pinned so nobody can inflate it.
-                            && incoming().donationsTotal == 0;
+                            // Donation counts are not self-certifiable. Pinned to
+                            // zero on create, then frozen: `resource` is null on
+                            // create, so this reads as "must start at 0 and never
+                            // change afterwards". Comparing to 0 on update too
+                            // would lock any donor with a non-zero tally out of
+                            // editing or hiding their own listing.
+                            && incoming().donationsTotal ==
+                                 (resource == null ? 0 : resource.data.donationsTotal);
 
       allow delete: if isOwner(uid);
     }

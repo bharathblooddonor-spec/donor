@@ -1,0 +1,13 @@
+<en-GB>
+First release of Bharath Blood Donor.
+
+• Search voluntary donors by blood group, district and city across Andhra Pradesh
+• Call, message or WhatsApp a donor directly
+• Post an emergency blood request, and mark it fulfilled
+• List yourself as a donor, set availability, hide your listing anytime
+• Check blood group compatibility
+• Detect your district and city with one tap
+• Delete your account and data from the About screen
+
+Not a blood bank. Donor details are self-reported. Emergency: call 108.
+</en-GB>
