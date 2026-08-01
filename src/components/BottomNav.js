@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
 export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) => {
-  // Android gesture/3-button navigation and the iPhone home indicator both sit
-  // over the bottom of the window. Without this padding the tab labels are
-  // physically covered by the system bar on most real devices.
+  // Android 3-button navigation, gesture bars, and iOS home indicators overlay
+  // the bottom of the screen. Ensure adequate padding so tab items and labels
+  // are never covered on any Android or iOS device.
   const insets = useSafeAreaInsets();
+  const safeBottomPadding = insets.bottom > 0 ? insets.bottom + 4 : (Platform.OS === 'android' ? 14 : 8);
 
   const tabs = [
     { id: 'search', label: 'SEARCH', icon: 'search' },
@@ -17,7 +18,7 @@ export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) =
   ];
 
   return (
-    <View style={[styles.navBar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+    <View style={[styles.navBar, { paddingBottom: safeBottomPadding }]}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
 
@@ -41,21 +42,19 @@ export const BottomNav = ({ activeTab, setActiveTab, requestsBadgeCount = 0 }) =
               />
               {tab.badge ? (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText} maxFontSizeMultiplier={1.2}>
+                  <Text style={styles.badgeText} maxFontSizeMultiplier={1.1}>
                     {tab.badge}
                   </Text>
                 </View>
               ) : null}
             </View>
 
-            {/* "BE A DONOR" is the longest label and overflows on narrow screens
-                at large system font sizes, so cap the scale and allow shrink. */}
             <Text
               style={[styles.tabLabel, isActive ? styles.activeLabel : styles.inactiveLabel]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
-              maxFontSizeMultiplier={1.2}
+              minimumFontScale={0.75}
+              maxFontSizeMultiplier={1.1}
             >
               {tab.label}
             </Text>
