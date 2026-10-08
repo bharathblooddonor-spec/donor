@@ -43,7 +43,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bharathblooddonor.ap",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -58,7 +58,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.bharathblooddonor.ap",
-      "versionCode": 17,
+      "versionCode": 18,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
