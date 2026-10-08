@@ -1,26 +1,35 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apBloodGroups } from '../data/apData';
 import { NativePicker } from '../components/NativePicker';
 import { authService } from '../api/authService';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '../constants/legal';
 
-/** Split into two linear checks — a single combined pattern backtracks badly. */
 function isValidEmail(value) {
   if (!/^[^\s@]+@[^\s@]+$/.test(value)) return false;
   const domain = value.slice(value.indexOf('@') + 1);
   return domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
 }
 
-/**
- * On success we do nothing here — App.js subscribes to Firebase auth state and
- * swaps this screen out automatically once the session exists.
- */
 export const AuthScreen = () => {
   const [activeTab, setActiveTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [district, setDistrict] = useState('NTR');
   const [bloodGroup, setBloodGroup] = useState('O+');
@@ -73,7 +82,6 @@ export const AuthScreen = () => {
       } else {
         await authService.signIn({ email: trimmedEmail, password });
       }
-      // App.js reacts to the auth state change and renders the main app.
     } catch (e) {
       Alert.alert(isRegister ? 'Could not create account' : 'Could not sign in', e.message);
     } finally {
@@ -111,190 +119,199 @@ export const AuthScreen = () => {
   return (
     <KeyboardAvoidingView
       style={styles.flex1}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.brandingHeader}>
-        <View style={styles.logoWrapper}>
-          <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
-        </View>
-        <Text style={styles.brandTitle}>BHARATH BLOOD DONOR</Text>
-        <Text style={styles.brandSubtitle}>Donate Blood, Save Lives</Text>
-      </View>
-
-      <View style={styles.authCard}>
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'signin' && styles.activeTabButton]}
-            onPress={() => switchTab('signin')}
-            activeOpacity={0.7}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'signin' }}
-          >
-            <Text style={[styles.tabText, activeTab === 'signin' && styles.activeTabText]}>
-              Sign In
-            </Text>
-            {activeTab === 'signin' && <View style={styles.activeTabIndicator} />}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'register' && styles.activeTabButton]}
-            onPress={() => switchTab('register')}
-            activeOpacity={0.7}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'register' }}
-          >
-            <Text style={[styles.tabText, activeTab === 'register' && styles.activeTabText]}>
-              Create Account
-            </Text>
-            {activeTab === 'register' && <View style={styles.activeTabIndicator} />}
-          </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        <View style={styles.brandingHeader}>
+          <View style={styles.logoWrapper}>
+            <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+          </View>
+          <Text style={styles.brandTitle}>BHARATH BLOOD DONOR</Text>
+          <Text style={styles.brandSubtitle}>Donate Blood, Save Lives</Text>
         </View>
 
-        <View style={styles.formContainer}>
-          {activeTab === 'register' && (
-            <>
-              <Text style={styles.fieldLabel}>Full Name *</Text>
-              <View style={styles.inputWrapper}>
-                <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. Srinivasa Rao"
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <NativePicker
-                    label="AP District *"
-                    selectedValue={district}
-                    onValueChange={setDistrict}
-                    items={apDistricts}
-                  />
-                </View>
-
-                <View style={styles.flex1}>
-                  <NativePicker
-                    label="Blood Group *"
-                    selectedValue={bloodGroup}
-                    onValueChange={setBloodGroup}
-                    items={apBloodGroups}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-
-          <Text style={styles.fieldLabel}>Email Address *</Text>
-          <View style={styles.inputWrapper}>
-            <Feather name="mail" size={18} color="#94a3b8" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. name@domain.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          <Text style={styles.fieldLabel}>Password *</Text>
-          <View style={styles.inputWrapper}>
-            <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder={isRegister ? 'At least 8 characters' : '••••••••'}
-              secureTextEntry={true}
-              autoCapitalize="none"
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              textContentType={isRegister ? 'newPassword' : 'password'}
-              value={password}
-              onChangeText={setPassword}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="go"
-            />
-          </View>
-
-          {!isRegister && (
+        <View style={styles.authCard}>
+          <View style={styles.tabBar}>
             <TouchableOpacity
-              onPress={handleForgotPassword}
-              style={styles.forgotBtn}
+              style={[styles.tabButton, activeTab === 'signin' && styles.activeTabButton]}
+              onPress={() => switchTab('signin')}
               activeOpacity={0.7}
-              accessibilityRole="button"
             >
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={submitting}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={isRegister ? 'Create your account' : 'Sign in to your account'}
-          >
-            <View style={styles.btnContent}>
-              {submitting ? (
-                <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
-              ) : (
-                <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginRight: 6 }} />
-              )}
-              <Text style={styles.primaryButtonText}>{submitLabel}</Text>
-            </View>
-          </TouchableOpacity>
-
-          {isRegister && (
-            <Text style={styles.legalText}>
-              By creating an account you agree to our{' '}
-              <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
-                Terms of Use
-              </Text>{' '}
-              and{' '}
-              <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-                Privacy Policy
+              <Text style={[styles.tabText, activeTab === 'signin' && styles.activeTabText]}>
+                Sign In
               </Text>
-              . Creating an account does not publish your details — you choose separately
-              whether to list yourself as a donor.
-            </Text>
-          )}
-        </View>
-      </View>
+              {activeTab === 'signin' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
 
-      <View style={styles.emergencyNotice}>
-        <Feather name="alert-circle" size={14} color="#991b1b" style={{ marginRight: 6 }} />
-        <Text style={styles.emergencyNoticeText}>
-          This app is not a substitute for emergency medical care. In an emergency, call 108.
-        </Text>
-      </View>
-    </ScrollView>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'register' && styles.activeTabButton]}
+              onPress={() => switchTab('register')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === 'register' && styles.activeTabText]}>
+                Create Account
+              </Text>
+              {activeTab === 'register' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.formContainer}>
+            {activeTab === 'register' && (
+              <>
+                <Text style={styles.fieldLabel}>Full Name *</Text>
+                <View style={styles.inputWrapper}>
+                  <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. Srinivasa Rao"
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.flex1}>
+                    <NativePicker
+                      label="AP District *"
+                      selectedValue={district}
+                      onValueChange={setDistrict}
+                      items={apDistricts}
+                    />
+                  </View>
+
+                  <View style={styles.flex1}>
+                    <NativePicker
+                      label="Blood Group *"
+                      selectedValue={bloodGroup}
+                      onValueChange={setBloodGroup}
+                      items={apBloodGroups}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            <Text style={styles.fieldLabel}>Email Address *</Text>
+            <View style={styles.inputWrapper}>
+              <Feather name="mail" size={18} color="#94a3b8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. name@domain.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+
+            <Text style={styles.fieldLabel}>Password *</Text>
+            <View style={styles.inputWrapper}>
+              <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder={isRegister ? 'At least 8 characters' : '••••••••'}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                textContentType={isRegister ? 'newPassword' : 'password'}
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleSubmit}
+                returnKeyType="go"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword((prev) => !prev)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {!isRegister && (
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                style={styles.forgotBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={submitting}
+              activeOpacity={0.85}
+            >
+              <View style={styles.btnContent}>
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+                ) : (
+                  <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+                )}
+                <Text style={styles.primaryButtonText}>{submitLabel}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {isRegister && (
+              <Text style={styles.legalText}>
+                By creating an account you agree to our{' '}
+                <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                  Terms of Use
+                </Text>{' '}
+                and{' '}
+                <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                  Privacy Policy
+                </Text>
+                . Creating an account does not publish your details — you choose separately
+                whether to list yourself as a donor.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.emergencyNotice}>
+          <Feather name="alert-circle" size={14} color="#991b1b" style={{ marginRight: 6 }} />
+          <Text style={styles.emergencyNoticeText}>
+            This app is not a substitute for emergency medical care. In an emergency, call 108.
+          </Text>
+        </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+    backgroundColor: '#fff5f5',
+  },
   container: {
     flexGrow: 1,
     backgroundColor: '#fff5f5',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 30,
+    paddingVertical: 24,
   },
   brandingHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   logoWrapper: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -303,13 +320,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 2,
     borderColor: '#fee2e2',
   },
   logoImage: {
-    width: 72,
-    height: 72,
+    width: 66,
+    height: 66,
   },
   brandTitle: {
     fontSize: 20,
@@ -391,6 +408,10 @@ const styles = StyleSheet.create({
   inputIcon: {
     marginRight: 10,
   },
+  eyeBtn: {
+    padding: 4,
+    marginLeft: 6,
+  },
   textInput: {
     flex: 1,
     fontSize: 14,
@@ -400,9 +421,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 12,
-  },
-  flex1: {
-    flex: 1,
   },
   primaryButton: {
     backgroundColor: '#D32F2F',
