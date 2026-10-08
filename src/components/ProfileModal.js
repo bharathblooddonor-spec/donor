@@ -79,6 +79,44 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
     }
   };
 
+  const handleRecordDonationToday = () => {
+    if (!currentUser) return;
+    const monthsText = (gender || '').toUpperCase() === 'FEMALE' ? '4 months' : '3 months';
+
+    Alert.alert(
+      'Record Blood Donation',
+      `Did you donate blood today? This will lock your profile in recovery mode for ${monthsText} as per medical safety guidelines.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm Donation',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await apiService.recordDonation({
+                donorId: currentUser.uid,
+                donorGender: gender || 'Male',
+                bloodGroup: bloodGroup || 'O+',
+                donationDate: new Date().toISOString().split('T')[0],
+                notes: 'Self-reported donation today',
+              });
+              Alert.alert(
+                'Donation Recorded ❤️',
+                `Thank you for donating blood and saving a life! Your donor profile is now locked in recovery for ${monthsText}.`
+              );
+              await loadUserProfile();
+              if (onProfileUpdated) onProfileUpdated();
+            } catch (e) {
+              Alert.alert('Error', e.message || 'Could not record donation.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Required field', 'Please enter your name.');
@@ -156,7 +194,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                 {hasDonorListing && (
                   <View style={isCooldownActive ? styles.cooldownBadge : styles.availableBadge}>
                     <Text style={isCooldownActive ? styles.cooldownBadgeText : styles.availableBadgeText}>
-                      {isCooldownActive ? '● DONATION COOLDOWN' : '● AVAILABLE TO DONATE'}
+                      {isCooldownActive ? '● DONATION COOLDOWN (PROFILE LOCKED)' : '● AVAILABLE TO DONATE'}
                     </Text>
                   </View>
                 )}
@@ -167,10 +205,10 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                 <View style={styles.cooldownInfoCard}>
                   <View style={styles.cooldownHeader}>
                     <Ionicons name="time-outline" size={18} color="#9f1239" />
-                    <Text style={styles.cooldownCardTitle}>Donation Cooldown Active</Text>
+                    <Text style={styles.cooldownCardTitle}>Donation Recovery Active</Text>
                   </View>
                   <Text style={styles.cooldownCardBody}>
-                    You recently donated blood. You will be eligible to appear as an available donor again on:
+                    You recently donated blood. Your profile is locked and you will be eligible to appear as an available donor again on:
                   </Text>
                   <View style={styles.cooldownDateBox}>
                     <Text style={styles.cooldownDateText}>{formatReadableDate(donorRecord?.cooldownUntil)}</Text>
@@ -178,6 +216,19 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                   </View>
                   <Text style={styles.disclaimerText}>{MEDICAL_DISCLAIMER_TEXT}</Text>
                 </View>
+              )}
+
+              {/* Record Donation Action Button for Available Registered Donors */}
+              {hasDonorListing && !isCooldownActive && (
+                <TouchableOpacity
+                  style={styles.recordDonationBtn}
+                  onPress={handleRecordDonationToday}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="check-circle" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                  <Text style={styles.recordDonationBtnText}>I Donated Blood Today (Lock Profile)</Text>
+                </TouchableOpacity>
               )}
 
               {/* Account Email Display */}
@@ -272,7 +323,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                   <Text style={styles.switchTitle}>Available for Emergency Donation</Text>
                   <Text style={styles.switchSubtitle}>
                     {isCooldownActive
-                      ? `Your availability is locked during donation cooldown until ${formatReadableDate(donorRecord?.cooldownUntil)}.`
+                      ? `Your availability is locked during recovery until ${formatReadableDate(donorRecord?.cooldownUntil)}.`
                       : hasDonorListing
                       ? 'Show your contact in blood search results for recipients in need.'
                       : 'You are not listed as a donor yet. Register on the Be a Donor tab to publish your listing.'}
@@ -312,7 +363,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                           Blood Group: <Text style={styles.boldDetail}>{item.bloodGroup || bloodGroup}</Text>
                         </Text>
                         <Text style={styles.historyDetailText}>
-                          Cooldown: <Text style={styles.boldDetail}>{item.cooldownMonths || 3} months</Text>
+                          Cooldown: <Text style={styles.boldDetail}>{item.cooldownMonths || ((gender || '').toUpperCase() === 'FEMALE' ? 4 : 3)} months</Text>
                         </Text>
                         <Text style={styles.historyDetailText}>
                           Available Again: <Text style={styles.boldDetail}>{formatReadableDate(item.cooldownUntil)}</Text>
@@ -491,6 +542,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#9f1239',
+  },
+  recordDonationBtn: {
+    backgroundColor: '#D32F2F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  recordDonationBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   disclaimerText: {
     fontSize: 10,

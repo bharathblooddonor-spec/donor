@@ -51,6 +51,48 @@ export const BeADonorScreen = ({ onRegistered }) => {
     }
   };
 
+  const handleRecordDonationToday = () => {
+    const user = authService.getCurrentUser();
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to record your blood donation.');
+      return;
+    }
+
+    const monthsText = (gender || '').toUpperCase() === 'FEMALE' ? '4 months' : '3 months';
+
+    Alert.alert(
+      'Record Blood Donation',
+      `Did you donate blood today? This will lock your profile in recovery mode for ${monthsText} as per medical safety guidelines.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm Donation',
+          onPress: async () => {
+            try {
+              setIsSubmitting(true);
+              await apiService.recordDonation({
+                donorId: user.uid,
+                donorGender: gender || 'Male',
+                bloodGroup: bloodGroup || 'O+',
+                donationDate: new Date().toISOString().split('T')[0],
+                notes: 'Self-reported donation today',
+              });
+              Alert.alert(
+                'Donation Recorded ❤️',
+                `Thank you for donating blood and helping save a life! Your donor profile is now locked in recovery for ${monthsText}.`
+              );
+              await loadExistingDonorProfile();
+            } catch (e) {
+              Alert.alert('Error', e.message || 'Could not record donation.');
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDetectGps = async () => {
     setGpsLoading(true);
     setGpsText('');
@@ -120,6 +162,7 @@ export const BeADonorScreen = ({ onRegistered }) => {
         'Registered Successfully',
         `${newDonor?.name || name}, you are now a registered blood donor in ${newDonor?.district || district}, AP.`
       );
+      await loadExistingDonorProfile();
       if (onRegistered) onRegistered();
     } catch (e) {
       Alert.alert('Registration failed', e.message || 'Failed to register. Please try again.');
@@ -142,15 +185,14 @@ export const BeADonorScreen = ({ onRegistered }) => {
         <View style={styles.cooldownCard}>
           <View style={styles.cooldownHeaderRow}>
             <Text style={styles.cooldownEmoji}>🩸</Text>
-            <Text style={styles.cooldownTitle}>Donation Recovery</Text>
+            <Text style={styles.cooldownTitle}>Donation Recovery Active</Text>
           </View>
           <Text style={styles.cooldownBody}>
-            Thank you for donating blood and helping save a life. Your donor profile is temporarily unavailable for new donation requests.
+            Thank you for donating blood and helping save a life. Your donor profile is locked and temporarily unavailable for new donation requests.
           </Text>
           <View style={styles.cooldownMetaRow}>
             <View style={styles.cooldownMetaItem}>
               <Text style={styles.cooldownMetaLabel}>Available again:</Text>
-
               <Text style={styles.cooldownMetaValue}>{formatReadableDate(existingDonor.cooldownUntil)}</Text>
             </View>
             <View style={styles.cooldownMetaItem}>
@@ -159,6 +201,30 @@ export const BeADonorScreen = ({ onRegistered }) => {
             </View>
           </View>
           <Text style={styles.disclaimerText}>{MEDICAL_DISCLAIMER_TEXT}</Text>
+        </View>
+      )}
+
+      {/* Record Donation Action Card for Registered Donors */}
+      {existingDonor && !isCooldownActive && (
+        <View style={styles.recordDonationCard}>
+          <View style={styles.recordDonationHeader}>
+            <Text style={styles.recordEmoji}>🩸</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recordTitle}>Did you donate blood recently?</Text>
+              <Text style={styles.recordSub}>
+                Record your donation to automatically lock your profile for recovery ({gender === 'Female' ? '4 months' : '3 months'}).
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.recordBtn}
+            onPress={handleRecordDonationToday}
+            disabled={isSubmitting}
+            activeOpacity={0.8}
+          >
+            <Feather name="check-circle" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+            <Text style={styles.recordBtnText}>I Donated Blood Today</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -374,6 +440,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#be123c',
     marginTop: 2,
+  },
+  recordDonationCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    elevation: 2,
+  },
+  recordDonationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  recordEmoji: {
+    fontSize: 24,
+  },
+  recordTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991b1b',
+  },
+  recordSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  recordBtn: {
+    backgroundColor: '#D32F2F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  recordBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   disclaimerText: {
     fontSize: 10,
