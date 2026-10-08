@@ -43,7 +43,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bharathblooddonor.ap",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "config": {
         "usesNonExemptEncryption": false
       },
