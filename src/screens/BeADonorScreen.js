@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { apiService } from '../api/apiService';
+import { authService } from '../api/authService';
 import { detectDistrictAndCity } from '../utils/location';
 import { NativePicker } from '../components/NativePicker';
+import { evaluateDonorStatus, formatReadableDate, getRemainingCooldownDays, MEDICAL_DISCLAIMER_TEXT } from '../utils/cooldown';
 
-/** Indian mobile numbers are 10 digits starting 6-9, optionally +91 prefixed. */
 const INDIAN_MOBILE_RE = /^(?:\+?91)?[6-9]\d{9}$/;
 
 export const BeADonorScreen = ({ onRegistered }) => {
   const [name, setName] = useState('');
   const [age, setAge] = useState('25');
-  const [gender, setGender] = useState('Select');
+  const [gender, setGender] = useState('Male');
   const [bloodGroup, setBloodGroup] = useState('O+');
   const [currentStatus, setCurrentStatus] = useState('Available for Call');
   const [phone, setPhone] = useState('');
@@ -23,6 +24,32 @@ export const BeADonorScreen = ({ onRegistered }) => {
   const [gpsText, setGpsText] = useState('');
   const [gpsLoading, setGpsLoading] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
+  const [existingDonor, setExistingDonor] = useState(null);
+
+  useEffect(() => {
+    loadExistingDonorProfile();
+  }, []);
+
+  const loadExistingDonorProfile = async () => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      try {
+        const d = await authService.getDonorProfile(user.uid);
+        if (d) {
+          setExistingDonor(d);
+          if (d.name) setName(d.name);
+          if (d.age) setAge(String(d.age));
+          if (d.gender) setGender(d.gender);
+          if (d.bloodGroup) setBloodGroup(d.bloodGroup);
+          if (d.phone) setPhone(d.phone);
+          if (d.district) setDistrict(d.district);
+          if (d.city) setCity(d.city);
+        }
+      } catch (e) {
+        console.warn('Could not load donor profile', e);
+      }
+    }
+  };
 
   const handleDetectGps = async () => {
     setGpsLoading(true);
@@ -47,11 +74,10 @@ export const BeADonorScreen = ({ onRegistered }) => {
       Alert.alert('Form Error', 'Please enter your full name.');
       return;
     }
-    if (gender === 'Select') {
+    if (!gender || gender === 'Select') {
       Alert.alert('Form Error', 'Please select your gender.');
       return;
     }
-    // Blood donation in India is restricted to donors aged 18-65.
     if (!Number.isFinite(parsedAge) || parsedAge < 18 || parsedAge > 65) {
       Alert.alert(
         'Age Not Eligible',
@@ -105,8 +131,37 @@ export const BeADonorScreen = ({ onRegistered }) => {
   const availableCities = apCitiesByDistrict[district] || ["Vijayawada", "Guntur", "Visakhapatnam", "Tirupati"];
   const districtOptions = ['Select District', ...apDistricts];
 
+  const donorStatus = evaluateDonorStatus(existingDonor);
+  const isCooldownActive = donorStatus === 'DONATION_COOLDOWN';
+  const remainingDays = isCooldownActive ? getRemainingCooldownDays(existingDonor?.cooldownUntil) : 0;
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Recovery Card when Donor is in Cooldown */}
+      {isCooldownActive && (
+        <View style={styles.cooldownCard}>
+          <View style={styles.cooldownHeaderRow}>
+            <Text style={styles.cooldownEmoji}>🩸</Text>
+            <Text style={styles.cooldownTitle}>Donation Recovery</Text>
+          </View>
+          <Text style={styles.cooldownBody}>
+            Thank you for donating blood and helping save a life. Your donor profile is temporarily unavailable for new donation requests.
+          </Text>
+          <View style={styles.cooldownMetaRow}>
+            <View style={styles.cooldownMetaItem}>
+              <Text style={styles.cooldownMetaLabel}>Available again:</Text>
+
+              <Text style={styles.cooldownMetaValue}>{formatReadableDate(existingDonor.cooldownUntil)}</Text>
+            </View>
+            <View style={styles.cooldownMetaItem}>
+              <Text style={styles.cooldownMetaLabel}>Remaining:</Text>
+              <Text style={styles.cooldownMetaValue}>{remainingDays} days</Text>
+            </View>
+          </View>
+          <Text style={styles.disclaimerText}>{MEDICAL_DISCLAIMER_TEXT}</Text>
+        </View>
+      )}
+
       <View style={styles.topInfoCard}>
         <Feather name="shield" size={26} color="#D32F2F" style={{ marginRight: 10 }} />
         <View style={{ flex: 1 }}>
@@ -129,8 +184,6 @@ export const BeADonorScreen = ({ onRegistered }) => {
         />
 
         <View style={styles.row}>
-          {/* Proportional rather than a fixed 100px: on a 320dp screen a fixed
-              width plus the blood-group picker overflows the row. */}
           <View style={styles.ageField}>
             <Text style={styles.label}>Age *</Text>
             <TextInput
@@ -156,7 +209,7 @@ export const BeADonorScreen = ({ onRegistered }) => {
           label="Gender *"
           selectedValue={gender}
           onValueChange={setGender}
-          items={['Select', 'Male', 'Female', 'Other']}
+          items={['Male', 'Female', 'Other']}
         />
 
         <NativePicker
@@ -171,7 +224,7 @@ export const BeADonorScreen = ({ onRegistered }) => {
           <Feather name="phone" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.phoneInput}
-            placeholder="e.g. +91 98480 12345"
+            placeholder="e.g. 9848012345"
             keyboardType="phone-pad"
             value={phone}
             onChangeText={setPhone}
@@ -211,8 +264,6 @@ export const BeADonorScreen = ({ onRegistered }) => {
           onPress={handleDetectGps}
           disabled={gpsLoading}
           activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Detect my district and city using GPS"
         >
           {gpsLoading ? (
             <ActivityIndicator size="small" color="#D32F2F" style={{ marginRight: 6 }} />
@@ -232,15 +283,10 @@ export const BeADonorScreen = ({ onRegistered }) => {
           items={['First Time Donor (Never)', 'Within 3 Months', 'More than 3 Months Ago', 'More than 6 Months Ago']}
         />
 
-        {/* Explicit consent — blood group is health data, so publishing it
-            alongside a phone number needs an affirmative opt-in, not a notice. */}
         <TouchableOpacity
           style={styles.consentRow}
           onPress={() => setConsentGiven((prev) => !prev)}
           activeOpacity={0.7}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: consentGiven }}
-          accessibilityLabel="I consent to my details being shown to people searching for donors"
         >
           <View style={[styles.checkbox, consentGiven && styles.checkboxChecked]}>
             {consentGiven && <Feather name="check" size={13} color="#ffffff" />}
@@ -248,28 +294,24 @@ export const BeADonorScreen = ({ onRegistered }) => {
           <Text style={styles.consentText}>
             I agree that my <Text style={styles.consentBold}>name, age, gender, blood group,
             district and phone number</Text> will be publicly visible to anyone searching for
-            donors. I can request removal at any time from the About screen.
+            donors in AP.
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.registerSubmitBtn, isSubmitting && { opacity: 0.6 }]}
+          style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
           onPress={handleRegister}
           disabled={isSubmitting}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Register as a blood donor"
+          activeOpacity={0.8}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+            <ActivityIndicator color="#ffffff" />
           ) : (
-            <Feather name="check-circle" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+            <Text style={styles.submitBtnText}>PUBLISH DONOR PROFILE</Text>
           )}
-          <Text style={styles.registerSubmitText}>
-            {isSubmitting ? 'Registering…' : 'Register Now'}
-          </Text>
         </TouchableOpacity>
       </View>
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 };
@@ -278,45 +320,107 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 12,
+  },
+  cooldownCard: {
+    backgroundColor: '#fff1f2',
+    borderColor: '#fecdd3',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  cooldownHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  cooldownEmoji: {
+    fontSize: 20,
+  },
+  cooldownTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9f1239',
+  },
+  cooldownBody: {
+    fontSize: 13,
+    color: '#881337',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  cooldownMetaRow: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderRadius: 12,
+    justifyContent: 'space-around',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+  },
+  cooldownMetaItem: {
+    alignItems: 'center',
+  },
+  cooldownMetaLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  cooldownMetaValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#be123c',
+    marginTop: 2,
+  },
+  disclaimerText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
   },
   topInfoCard: {
     flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#fee2e2',
-    elevation: 1,
+    borderLeftWidth: 4,
+    borderLeftColor: '#D32F2F',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
   },
   infoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  infoSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  formHeaderTitle: {
     fontSize: 14,
     fontWeight: '800',
     color: '#D32F2F',
-    marginBottom: 2,
-  },
-  infoSub: {
-    fontSize: 11,
-    color: '#64748B',
-    lineHeight: 15,
-  },
-  formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    elevation: 2,
-  },
-  formHeaderTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
-    marginBottom: 14,
+    marginBottom: 16,
+    letterSpacing: 0.5,
   },
   label: {
     fontSize: 12,
@@ -325,127 +429,117 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    height: 44,
+    height: 46,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 14,
     color: '#0f172a',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     marginBottom: 12,
   },
   row: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   ageField: {
-    flex: 1,
-    minWidth: 0,
-    maxWidth: 110,
+    flex: 0.45,
   },
   flex1: {
-    flex: 2,
-    minWidth: 0,
+    flex: 1,
   },
   phoneInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 46,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 44,
-    backgroundColor: '#ffffff',
-    marginBottom: 4,
+    backgroundColor: '#fff',
   },
   phoneInput: {
     flex: 1,
     fontSize: 14,
     color: '#0f172a',
-    height: '100%',
   },
   footnote: {
-    fontSize: 10,
-    color: '#64748B',
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 4,
     marginBottom: 12,
-    lineHeight: 14,
   },
   gpsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#D32F2F',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    height: 42,
+    paddingVertical: 10,
     backgroundColor: '#fff5f5',
-    marginBottom: 8,
-  },
-  gpsButtonText: {
-    color: '#D32F2F',
-    fontSize: 12,
-    fontWeight: '700',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    marginBottom: 12,
   },
   gpsButtonDisabled: {
     opacity: 0.6,
   },
-  gpsText: {
-    fontSize: 11,
-    color: '#16a34a',
-    textAlign: 'center',
-    marginBottom: 10,
+  gpsButtonText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#D32F2F',
+  },
+  gpsText: {
+    fontSize: 12,
+    color: '#16a34a',
+    marginBottom: 12,
+    fontWeight: '500',
   },
   consentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#fff5f5',
-    borderWidth: 1,
-    borderColor: '#fee2e2',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
+    marginVertical: 12,
+    gap: 10,
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#D32F2F',
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    marginTop: 1,
-    backgroundColor: '#ffffff',
+    marginTop: 2,
   },
   checkboxChecked: {
     backgroundColor: '#D32F2F',
+    borderColor: '#D32F2F',
   },
   consentText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     color: '#475569',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   consentBold: {
     fontWeight: '700',
-    color: '#334155',
+    color: '#1e293b',
   },
-  registerSubmitBtn: {
+  submitBtn: {
     backgroundColor: '#D32F2F',
-    height: 46,
+    height: 48,
     borderRadius: 8,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
-    elevation: 2,
+    marginTop: 8,
   },
-  registerSubmitText: {
-    color: '#ffffff',
+  submitBtnDisabled: {
+    backgroundColor: '#f87171',
+  },
+  submitBtnText: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

@@ -51,7 +51,16 @@ export const RequestsScreen = () => {
     }
   };
 
-  const handleIDonate = (req) => {
+  const handleIDonate = async (req) => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      const check = await apiService.canDonorAcceptRequest(user.uid);
+      if (!check.allowed) {
+        Alert.alert('Donation Unavailable', check.message);
+        return;
+      }
+    }
+
     const text = encodeURIComponent(`Hello ${req.contactName}, I saw your emergency blood request for ${req.patientName} (${req.bloodGroup}, ${req.units} units) at ${req.hospitalName}. I want to donate!`);
     const url = `whatsapp://send?phone=${req.phone.replace(/[^0-9]/g, '')}&text=${text}`;
     Linking.openURL(url).catch(() => {
@@ -59,14 +68,43 @@ export const RequestsScreen = () => {
     });
   };
 
-  const handleMarkFulfilled = async (id) => {
-    try {
-      await apiService.fulfillRequest(id);
-      Alert.alert('Thank you', 'Request marked as fulfilled.');
-      fetchRequests();
-    } catch (e) {
-      Alert.alert('Could not update request', e.message || 'Please try again.');
-    }
+  const handleMarkFulfilled = async (item) => {
+    const reqId = item?.id || item;
+    Alert.alert(
+      'Fulfill Request',
+      'Was this blood request fulfilled by a blood donation?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, I Donated Blood',
+          onPress: async () => {
+            try {
+              const currentUid = authService.getCurrentUser()?.uid;
+              await apiService.fulfillRequestWithDonor({ requestId: reqId, donorId: currentUid });
+              Alert.alert(
+                'Thank You For Donating ❤️',
+                'Your donation has been confirmed! Your donor profile is temporarily in cooldown to ensure safe recovery.'
+              );
+              fetchRequests();
+            } catch (e) {
+              Alert.alert('Could not update request', e.message || 'Please try again.');
+            }
+          },
+        },
+        {
+          text: 'Yes, Fulfilled (Other)',
+          onPress: async () => {
+            try {
+              await apiService.fulfillRequest(reqId);
+              Alert.alert('Thank you', 'Request marked as fulfilled.');
+              fetchRequests();
+            } catch (e) {
+              Alert.alert('Could not update request', e.message || 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleReportRequest = (item) => {
@@ -253,7 +291,7 @@ export const RequestsScreen = () => {
 
                 <TouchableOpacity
                   style={styles.fulfillBtn}
-                  onPress={() => handleMarkFulfilled(item.id)}
+                  onPress={() => handleMarkFulfilled(item)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.fulfillBtnText}>Mark Fulfilled</Text>

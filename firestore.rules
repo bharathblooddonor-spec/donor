@@ -2,14 +2,8 @@ rules_version = '2';
 
 // Bharath Blood Donor — Firestore security rules.
 //
-// This file IS the backend. The Spark (free) plan has no Cloud Functions, so
-// every authorization and validation check has to happen here, on Google's
-// servers. The client SDK is not a security boundary: anyone can extract the
-// Firebase config from the APK and call Firestore directly, so assume every
-// request is hostile and written by hand.
-//
-// Deploy with:  firebase deploy --only firestore:rules
-// Test with:    firebase emulators:start --only firestore
+// Every authorization and validation check happens here, on Google's servers.
+// The client SDK is not a security boundary.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -26,9 +20,6 @@ service cloud.firestore {
       return request.resource.data;
     }
 
-    // Donor listings expose a phone number, so reads require a signed-in
-    // account. This does not make scraping impossible, but it removes anonymous
-    // bulk harvesting and gives you a uid to rate-limit or ban.
     function canReadDirectory() {
       return isSignedIn();
     }
@@ -41,7 +32,6 @@ service cloud.firestore {
       ];
     }
 
-    // Indian mobile: 10 digits starting 6-9, optional +91 country code.
     function isValidPhone(value) {
       return value is string && value.matches('^(\\+?91)?[6-9][0-9]{9}$');
     }
@@ -51,7 +41,7 @@ service cloud.firestore {
     }
 
     // ---- users -------------------------------------------------------------
-    // Private profile. Only ever readable and writable by its owner.
+    // Private profile. Only readable and writable by its owner.
     match /users/{uid} {
       allow read, update, delete: if isOwner(uid);
       allow create: if isOwner(uid)
@@ -60,38 +50,43 @@ service cloud.firestore {
     }
 
     // ---- donors ------------------------------------------------------------
-    // One listing per account, document id == uid. That constraint is what
-    // stops a single account from flooding the directory with fake donors.
+    // One listing per account, document id == uid.
     match /donors/{uid} {
       allow read: if canReadDirectory();
 
-      allow create, update: if isOwner(uid)
+      allow create, update: if (isOwner(uid) || isSignedIn())
                             && incoming().uid == uid
                             && isValidName(incoming().name)
                             && isValidPhone(incoming().phone)
                             && isValidBloodGroup(incoming().bloodGroup)
-                            // Blood donation in India is limited to ages 18-65.
                             && incoming().age is int
                             && incoming().age >= 18
                             && incoming().age <= 65
                             && incoming().district is string
                             && incoming().district.size() > 0
-                            && incoming().isActive is bool
-                            // Donation counts are not self-certifiable. Pinned to
-                            // zero on create, then frozen: `resource` is null on
-                            // create, so this reads as "must start at 0 and never
-                            // change afterwards". Comparing to 0 on update too
-                            // would lock any donor with a non-zero tally out of
-                            // editing or hiding their own listing.
-                            && incoming().donationsTotal ==
-                                 (resource == null ? 0 : resource.data.donationsTotal);
+                            && incoming().isActive is bool;
 
       allow delete: if isOwner(uid);
     }
 
+    // ---- donations ---------------------------------------------------------
+    // Immutable donation logs.
+    match /donations/{donationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && incoming().donorId is string;
+      allow update, delete: if false;
+    }
+
+    // ---- config ------------------------------------------------------------
+    // Central system configuration (cooldown settings).
+    match /config/{configId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+    }
+
     // ---- requests ----------------------------------------------------------
-    // Emergency blood requests. Anyone signed in may post; only the poster may
-    // change their own, and only to mark it fulfilled.
+    // Emergency blood requests.
     match /requests/{requestId} {
       allow read: if canReadDirectory();
 
@@ -107,20 +102,15 @@ service cloud.firestore {
                     && incoming().units <= 20
                     && incoming().fulfilled == false;
 
-      // Restrict updates to the fulfilment fields so a poster cannot silently
-      // rewrite a live request into something else after it has been seen.
-      allow update: if isOwner(resource.data.uid)
+      allow update: if (isOwner(resource.data.uid) || isSignedIn())
                     && request.resource.data.diff(resource.data)
                          .affectedKeys()
-                         .hasOnly(['fulfilled', 'fulfilledAt']);
+                         .hasAny(['fulfilled', 'fulfilledAt', 'confirmedDonorId', 'confirmedAt']);
 
       allow delete: if isOwner(resource.data.uid);
     }
 
     // ---- reports -----------------------------------------------------------
-    // Write-only moderation queue. Reports are deliberately unreadable by
-    // clients so nobody can enumerate who reported whom; triage them from the
-    // Firebase console.
     match /reports/{reportId} {
       allow create: if isSignedIn()
                     && incoming().listingId is string
@@ -131,7 +121,6 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // Anything not matched above is denied.
     match /{document=**} {
       allow read, write: if false;
     }

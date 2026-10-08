@@ -13,13 +13,16 @@ import {
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { authService } from '../api/authService';
+import { apiService } from '../api/apiService';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { NativePicker } from './NativePicker';
+import {
+  evaluateDonorStatus,
+  formatReadableDate,
+  getRemainingCooldownDays,
+  MEDICAL_DISCLAIMER_TEXT,
+} from '../utils/cooldown';
 
-/**
- * Apply a stored value to form state, leaving the existing default in place
- * when the field was never saved. `false` is a real value and must survive.
- */
 function applyIfSet(value, setter) {
   if (value !== undefined && value !== null && value !== '') setter(value);
 }
@@ -27,12 +30,15 @@ function applyIfSet(value, setter) {
 export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('Male');
   const [district, setDistrict] = useState('NTR');
   const [city, setCity] = useState('Vijayawada');
   const [bloodGroup, setBloodGroup] = useState('O+');
   const [age, setAge] = useState('25');
   const [availableToDonate, setAvailableToDonate] = useState(true);
   const [hasDonorListing, setHasDonorListing] = useState(false);
+  const [donorRecord, setDonorRecord] = useState(null);
+  const [donationHistory, setDonationHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
 
@@ -47,18 +53,22 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
     try {
       setName(currentUser.displayName || '');
 
-      const [profile, donor] = await Promise.all([
+      const [profile, donor, history] = await Promise.all([
         authService.getProfile(currentUser.uid),
         authService.getDonorProfile(currentUser.uid),
+        apiService.getDonationHistory(currentUser.uid),
       ]);
+
+      setDonorRecord(donor);
+      setDonationHistory(history || []);
 
       applyIfSet(profile?.name, setName);
       applyIfSet(profile?.phone, setPhone);
+      applyIfSet(profile?.gender || donor?.gender, setGender);
       applyIfSet(profile?.district, setDistrict);
       applyIfSet(profile?.city, setCity);
       applyIfSet(profile?.bloodGroup, setBloodGroup);
 
-      // age and isActive are stored on the listing, not the private profile.
       setHasDonorListing(Boolean(donor));
       applyIfSet(donor?.age && String(donor.age), setAge);
       applyIfSet(donor?.isActive, setAvailableToDonate);
@@ -80,6 +90,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
       const { donorListingUpdated } = await authService.updateUserProfile({
         name: name.trim(),
         phone: phone.trim(),
+        gender,
         district,
         city,
         bloodGroup,
@@ -92,7 +103,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
         donorListingUpdated
           ? 'Your profile and donor listing have been saved.'
           : 'Your profile has been saved. You are not listed as a donor yet, so your ' +
-            'availability and age were not published — register on the Be a Donor tab first.',
+            'availability and age were not published — register on the Be a Donor tab first.'
       );
       if (onProfileUpdated) onProfileUpdated();
       onClose();
@@ -104,6 +115,10 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
   };
 
   const cities = apCitiesByDistrict[district] || ['Main Area'];
+
+  const donorStatus = evaluateDonorStatus(donorRecord);
+  const isCooldownActive = donorStatus === 'DONATION_COOLDOWN';
+  const remainingDays = isCooldownActive ? getRemainingCooldownDays(donorRecord?.cooldownUntil) : 0;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -127,8 +142,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
             </View>
           ) : (
             <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-              {/* Initials stand in for a photo: there is no upload, and stock
-                  portraits of strangers would misrepresent who a donor is. */}
+              {/* DP & Status Badge */}
               <View style={styles.dpSection}>
                 <View style={styles.dpContainer}>
                   <View style={styles.dpFallback}>
@@ -137,7 +151,34 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                     </Text>
                   </View>
                 </View>
+
+                {/* Donor Availability / Cooldown Badge */}
+                {hasDonorListing && (
+                  <View style={isCooldownActive ? styles.cooldownBadge : styles.availableBadge}>
+                    <Text style={isCooldownActive ? styles.cooldownBadgeText : styles.availableBadgeText}>
+                      {isCooldownActive ? '● DONATION COOLDOWN' : '● AVAILABLE TO DONATE'}
+                    </Text>
+                  </View>
+                )}
               </View>
+
+              {/* Cooldown Information Card */}
+              {hasDonorListing && isCooldownActive && (
+                <View style={styles.cooldownInfoCard}>
+                  <View style={styles.cooldownHeader}>
+                    <Ionicons name="time-outline" size={18} color="#9f1239" />
+                    <Text style={styles.cooldownCardTitle}>Donation Cooldown Active</Text>
+                  </View>
+                  <Text style={styles.cooldownCardBody}>
+                    You recently donated blood. You will be eligible to appear as an available donor again on:
+                  </Text>
+                  <View style={styles.cooldownDateBox}>
+                    <Text style={styles.cooldownDateText}>{formatReadableDate(donorRecord?.cooldownUntil)}</Text>
+                    <Text style={styles.cooldownDaysText}>Remaining: {remainingDays} days</Text>
+                  </View>
+                  <Text style={styles.disclaimerText}>{MEDICAL_DISCLAIMER_TEXT}</Text>
+                </View>
+              )}
 
               {/* Account Email Display */}
               <View style={styles.infoBadgeContainer}>
@@ -172,35 +213,13 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
               <View style={styles.rowTwo}>
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <NativePicker
-                    label="District"
-                    selectedValue={district}
-                    items={apDistricts}
-                    onValueChange={(val) => {
-                      setDistrict(val);
-                      const availableCities = apCitiesByDistrict[val] || [];
-                      setCity(availableCities[0] || '');
-                    }}
+                    label="Gender"
+                    selectedValue={gender}
+                    items={['Male', 'Female', 'Other']}
+                    onValueChange={setGender}
                   />
                 </View>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <NativePicker
-                    label="City / Town"
-                    selectedValue={city}
-                    items={cities}
-                    onValueChange={setCity}
-                  />
-                </View>
-              </View>
 
-              <View style={styles.rowTwo}>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <NativePicker
-                    label="Blood Group"
-                    selectedValue={bloodGroup}
-                    items={apBloodGroups}
-                    onValueChange={setBloodGroup}
-                  />
-                </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Age</Text>
                   <TextInput
@@ -214,25 +233,97 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                 </View>
               </View>
 
+              <View style={styles.rowTwo}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <NativePicker
+                    label="District"
+                    selectedValue={district}
+                    items={apDistricts}
+                    onValueChange={(val) => {
+                      setDistrict(val);
+                      const availableCities = apCitiesByDistrict[val] || [];
+                      setCity(availableCities[0] || '');
+                    }}
+                  />
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <NativePicker
+                    label="City / Town"
+                    selectedValue={city}
+                    items={cities}
+                    onValueChange={setCity}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <NativePicker
+                  label="Blood Group"
+                  selectedValue={bloodGroup}
+                  items={apBloodGroups}
+                  onValueChange={setBloodGroup}
+                />
+              </View>
+
               {/* Emergency Donor Availability Switch */}
               <View style={styles.switchRow}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text style={styles.switchTitle}>Available for Emergency Donation</Text>
                   <Text style={styles.switchSubtitle}>
-                    {hasDonorListing
+                    {isCooldownActive
+                      ? `Your availability is locked during donation cooldown until ${formatReadableDate(donorRecord?.cooldownUntil)}.`
+                      : hasDonorListing
                       ? 'Show your contact in blood search results for recipients in need.'
-                      : 'You are not listed as a donor yet. Register on the Be a Donor tab to ' +
-                        'publish your listing — this switch has no effect until then.'}
+                      : 'You are not listed as a donor yet. Register on the Be a Donor tab to publish your listing.'}
                   </Text>
                 </View>
                 <Switch
-                  value={hasDonorListing && availableToDonate}
+                  value={hasDonorListing && !isCooldownActive && availableToDonate}
                   onValueChange={setAvailableToDonate}
-                  disabled={!hasDonorListing}
+                  disabled={!hasDonorListing || isCooldownActive}
                   trackColor={{ false: '#d1d5db', true: '#ef4444' }}
-                  thumbColor={availableToDonate ? '#ffffff' : '#f4f4f5'}
+                  thumbColor={availableToDonate && !isCooldownActive ? '#ffffff' : '#f4f4f5'}
                 />
               </View>
+
+              {/* Donation History Section */}
+              <View style={styles.historySection}>
+                <View style={styles.historyHeaderRow}>
+                  <Feather name="award" size={16} color="#D32F2F" />
+                  <Text style={styles.historyTitle}>Donation History</Text>
+                </View>
+
+                {donationHistory.length === 0 ? (
+                  <Text style={styles.noHistoryText}>No confirmed donations recorded yet.</Text>
+                ) : (
+                  donationHistory.map((item, idx) => (
+                    <View key={item.id || idx} style={styles.historyCard}>
+                      <View style={styles.historyCardRow}>
+                        <Text style={styles.historyNum}>Donation #{donationHistory.length - idx}</Text>
+                        <Text style={styles.historyStatusBadge}>Completed</Text>
+                      </View>
+
+                      <View style={styles.historyDetailsGrid}>
+                        <Text style={styles.historyDetailText}>
+                          Date: <Text style={styles.boldDetail}>{formatReadableDate(item.donationDate)}</Text>
+                        </Text>
+                        <Text style={styles.historyDetailText}>
+                          Blood Group: <Text style={styles.boldDetail}>{item.bloodGroup || bloodGroup}</Text>
+                        </Text>
+                        <Text style={styles.historyDetailText}>
+                          Cooldown: <Text style={styles.boldDetail}>{item.cooldownMonths || 3} months</Text>
+                        </Text>
+                        <Text style={styles.historyDetailText}>
+                          Available Again: <Text style={styles.boldDetail}>{formatReadableDate(item.cooldownUntil)}</Text>
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <View style={{ height: 20 }} />
             </ScrollView>
           )}
 
@@ -330,6 +421,84 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
   },
+  availableBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  availableBadgeText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cooldownBadge: {
+    backgroundColor: '#ffe4e6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  cooldownBadgeText: {
+    color: '#be123c',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cooldownInfoCard: {
+    backgroundColor: '#fff1f2',
+    borderColor: '#fecdd3',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 10,
+  },
+  cooldownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  cooldownCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#9f1239',
+  },
+  cooldownCardBody: {
+    fontSize: 12,
+    color: '#881337',
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  cooldownDateBox: {
+    backgroundColor: '#ffffff',
+    padding: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+  },
+  cooldownDateText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#be123c',
+  },
+  cooldownDaysText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9f1239',
+  },
+  disclaimerText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 6,
+  },
   infoBadgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -390,6 +559,67 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#7f1d1d',
     marginTop: 2,
+  },
+  historySection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  historyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  noHistoryText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  historyCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  historyCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  historyNum: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  historyStatusBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#16a34a',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  historyDetailsGrid: {
+    gap: 2,
+  },
+  historyDetailText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  boldDetail: {
+    fontWeight: '600',
+    color: '#334155',
   },
   modalFooter: {
     flexDirection: 'row',

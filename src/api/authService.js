@@ -139,7 +139,7 @@ export const authService = {
     const user = auth.currentUser;
     if (!user) throw new AuthError('auth/user-not-found');
 
-    const { name, photoURL, phone, district, city, bloodGroup, age, availableToDonate } = profileData;
+    const { name, photoURL, phone, district, city, bloodGroup, gender, age, availableToDonate } = profileData;
     const displayName = name || user.displayName;
 
     try {
@@ -149,28 +149,37 @@ export const authService = {
       });
 
       // Fields common to the private profile and the public listing.
-      const shared = pickProvided({ phone, district, city, bloodGroup });
+      const shared = pickProvided({ phone, district, city, bloodGroup, gender });
       if (photoURL !== undefined) shared.photoURL = photoURL;
 
-      // uid and email are required by the users/ create rule. They are
-      // unchanged on every normal save, but including them means a merge onto
-      // a missing document still passes validation instead of being denied.
       await setDoc(
         doc(db, 'users', user.uid),
         { ...shared, uid: user.uid, email: user.email, name: displayName, updatedAt: serverTimestamp() },
         { merge: true },
       );
 
-      // The listing is deliberately never created here. Publishing a blood
-      // group is health data and needs the explicit consent collected on the
-      // Be a Donor screen — not a toggle inside a profile sheet.
       const donorRef = doc(db, 'donors', user.uid);
-      const donorListingUpdated = (await getDoc(donorRef)).exists();
+      const donorSnap = await getDoc(donorRef);
+      const donorListingUpdated = donorSnap.exists();
 
       if (donorListingUpdated) {
+        const donorData = donorSnap.data();
+        const now = new Date().getTime();
+        const cooldownTime = donorData?.cooldownUntil ? new Date(donorData.cooldownUntil).getTime() : 0;
+        const isCurrentlyInCooldown = cooldownTime > now;
+
         const donorUpdate = { ...shared, name: displayName, updatedAt: serverTimestamp() };
         if (age) donorUpdate.age = Number(age);
-        if (availableToDonate !== undefined) donorUpdate.isActive = Boolean(availableToDonate);
+        if (gender) donorUpdate.gender = gender;
+
+        // Prevent manual bypass during active donation cooldown
+        if (isCurrentlyInCooldown) {
+          donorUpdate.isActive = false;
+          donorUpdate.status = 'DONATION_COOLDOWN';
+        } else if (availableToDonate !== undefined) {
+          donorUpdate.isActive = Boolean(availableToDonate);
+          if (availableToDonate) donorUpdate.status = 'AVAILABLE';
+        }
 
         await setDoc(donorRef, donorUpdate, { merge: true });
       }
