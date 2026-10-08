@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
-export const NativePicker = ({ label, selectedValue, onValueChange, items, placeholder = 'Select...' }) => {
+export const NativePicker = ({ label, selectedValue, onValueChange, items, options, placeholder = 'Select...' }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  // Support both 'items' and 'options' prop names seamlessly
+  const pickerItems = items || options || [];
+
   // This sheet sits flush against the bottom of the window, directly over the
   // Android navigation bar / iOS home indicator.
   const insets = useSafeAreaInsets();
@@ -29,12 +32,8 @@ export const NativePicker = ({ label, selectedValue, onValueChange, items, place
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setModalVisible(false)}
-        >
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+          <Pressable style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{label || 'Select Option'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -43,8 +42,8 @@ export const NativePicker = ({ label, selectedValue, onValueChange, items, place
             </View>
 
             <FlatList
-              data={items}
-              keyExtractor={(item) => (typeof item === 'string' ? item : item.value)}
+              data={pickerItems}
+              keyExtractor={(item, index) => (typeof item === 'string' ? `${item}-${index}` : `${item.value}-${index}`)}
               renderItem={({ item }) => {
                 const val = typeof item === 'string' ? item : item.value;
                 const isSelected = selectedValue === val;
@@ -65,8 +64,8 @@ export const NativePicker = ({ label, selectedValue, onValueChange, items, place
               }}
               style={styles.flatList}
             />
-          </View>
-        </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

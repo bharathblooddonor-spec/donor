@@ -174,7 +174,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                   <NativePicker
                     label="District"
                     selectedValue={district}
-                    options={apDistricts}
+                    items={apDistricts}
                     onValueChange={(val) => {
                       setDistrict(val);
                       const availableCities = apCitiesByDistrict[val] || [];
@@ -186,7 +186,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                   <NativePicker
                     label="City / Town"
                     selectedValue={city}
-                    options={cities}
+                    items={cities}
                     onValueChange={setCity}
                   />
                 </View>
@@ -197,7 +197,7 @@ export const ProfileModal = ({ visible, onClose, currentUser, onProfileUpdated }
                   <NativePicker
                     label="Blood Group"
                     selectedValue={bloodGroup}
-                    options={apBloodGroups}
+                    items={apBloodGroups}
                     onValueChange={setBloodGroup}
                   />
                 </View>
