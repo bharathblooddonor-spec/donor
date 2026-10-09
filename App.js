@@ -107,7 +107,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ExpoStatusBar style="light" backgroundColor="#D32F2F" />
+        <ExpoStatusBar style="light" />
         <View style={styles.appContainer}>
           <Header
             onLogout={handleLogout}

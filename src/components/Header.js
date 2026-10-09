@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
 export const Header = ({ onLogout, onFocus, onOpenProfile, currentUser }) => {
@@ -55,7 +56,7 @@ export const Header = ({ onLogout, onFocus, onOpenProfile, currentUser }) => {
           accessibilityLabel="Open user profile"
         >
           {currentUser?.photoURL ? (
-            <Image source={{ uri: currentUser.photoURL }} style={styles.profileDpImg} />
+            <ExpoImage source={{ uri: currentUser.photoURL }} style={styles.profileDpImg} contentFit="cover" transition={200} />
           ) : (
             <Ionicons name="person-circle" size={24} color="#ffffff" />
           )}

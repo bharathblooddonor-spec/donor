@@ -17,7 +17,7 @@
           "android": {
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "-repackageclasses 'o'\n-allowaccessmodification\n-dontusemixedcaseclassnames\n-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod"
+            "extraProguardRules": "-repackageclasses 'o'\n-allowaccessmodification\n-dontusemixedcaseclassnames\n-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod\n-optimizationpasses 5"
           }
         }
       ],
@@ -38,12 +38,13 @@
           "isAndroidForegroundServiceEnabled": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-image"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bharathblooddonor.ap",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -58,7 +59,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.bharathblooddonor.ap",
-      "versionCode": 21,
+      "versionCode": 22,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"

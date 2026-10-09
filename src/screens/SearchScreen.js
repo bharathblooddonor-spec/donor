@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Linking, Share, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { apDistricts, apCitiesByDistrict, apBloodGroups } from '../data/apData';
 import { apiService } from '../api/apiService';
 import { detectDistrictAndCity } from '../utils/location';
@@ -322,7 +323,7 @@ export const SearchScreen = () => {
                 <View style={styles.donorMetaColumn}>
                   <View style={styles.donorNameRow}>
                     {donor.photoURL ? (
-                      <Image source={{ uri: donor.photoURL }} style={styles.donorSmallDp} />
+                      <ExpoImage source={{ uri: donor.photoURL }} style={styles.donorSmallDp} contentFit="cover" transition={200} />
                     ) : null}
                     <Text style={styles.donorName} numberOfLines={1}>{donor.name}</Text>
                     {donor.isVerified && <View style={styles.onlineDot} />}
